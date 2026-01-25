@@ -1,0 +1,37 @@
+{# フォーム部品マクロ
+
+使用例:
+{% from 'macros/forms.html' import loading_row, form_card_header, add_button %}
+#}
+
+{# ローディング行 #}
+{% macro loading_row(colspan) %}
+<tr>
+    <td colspan="{{ colspan }}" class="loading">
+        <span class="loading-spinner"></span>
+        読み込み中...
+    </td>
+</tr>
+{% endmacro %}
+
+{# フォームカードヘッダー（プラスアイコン付き） #}
+{% macro form_card_header(title) %}
+<div class="form-card-header">
+    <div class="form-card-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+    </div>
+    <h2 class="form-card-title">{{ title }}</h2>
+</div>
+{% endmacro %}
+
+{# 追加ボタン（プラスアイコン付き） #}
+{% macro add_button(label='追加') %}
+<button type="submit" class="btn btn-primary">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    {{ label }}
+</button>
+{% endmacro %}

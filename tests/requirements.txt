@@ -1,0 +1,4 @@
+# テスト用依存
+pytest>=7.0
+httpx>=0.24
+pytest-playwright>=0.4

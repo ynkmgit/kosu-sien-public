@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% from 'macros/forms.html' import loading_row, form_card_header, add_button %}
+{% block title %}ステータス管理 - {{ project.name }}{% endblock %}
+{% block content %}
+{{ page_header(
+    title=project.name ~ ' - ステータス管理',
+    icon='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    breadcrumbs=[
+        {'label': 'プロジェクト一覧', 'href': '/projects'},
+        {'label': project.name, 'href': '/projects/' ~ project.id},
+        {'label': 'ステータス設定'}
+    ]
+) }}
+
+<div class="form-card">
+    {{ form_card_header('新規ステータス追加') }}
+    <form class="add-form" hx-post="/projects/{{ project.id }}/statuses" hx-target="#status-table tbody" hx-swap="beforeend" hx-on::after-request="this.reset()">
+        <div class="form-group">
+            <label class="form-label">コード</label>
+            <input type="text" name="code" placeholder="review" required class="form-input input-code">
+        </div>
+        <div class="form-group">
+            <label class="form-label">表示名</label>
+            <input type="text" name="name" placeholder="レビュー中" required class="form-input">
+        </div>
+        <div class="form-group">
+            <label class="form-label">並び順</label>
+            <input type="number" name="sort_order" value="0" class="form-input input-sort" step="1" min="0">
+        </div>
+        {{ add_button() }}
+    </form>
+</div>
+
+<div class="table-card">
+    <div class="table-header">
+        <span class="table-title">登録済みステータス</span>
+    </div>
+    <table id="status-table" hx-get="/projects/{{ project.id }}/statuses/list" hx-trigger="load" hx-swap="innerHTML">
+        <thead>
+            <tr>
+                <th class="col-code">コード</th>
+                <th>表示名</th>
+                <th class="col-sort">並び順</th>
+                <th class="col-actions-lg">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ loading_row(4) }}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 24px;">
+    <a href="/projects/{{ project.id }}" class="btn btn-ghost">← プロジェクト詳細に戻る</a>
+</div>
+{% endblock %}

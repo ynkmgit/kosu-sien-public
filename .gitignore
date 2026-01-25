@@ -1,0 +1,25 @@
+# データ
+data/
+
+# Claude Code
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+.obsidian/
+*.swp
+
+# Screenshots
+*.png
+*.jpg
+
+# Windows
+nul

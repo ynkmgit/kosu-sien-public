@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% block title %}担当割当 - {{ project.name }}{% endblock %}
+{% block content %}
+{{ page_header(
+    title=project.name ~ ' - 担当割当',
+    icon='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+    breadcrumbs=[
+        {'label': 'プロジェクト一覧', 'href': '/projects'},
+        {'label': project.name, 'href': '/projects/' ~ project.id},
+        {'label': '担当割当'}
+    ]
+) }}
+
+<div class="table-card">
+    <div class="table-header">
+        <span class="table-title">作業 × ユーザー マトリクス</span>
+        <span style="color: var(--text-muted); font-size: 0.85rem;">セルをクリックして担当を割当/解除</span>
+    </div>
+    <div id="matrix-container"
+         hx-get="/projects/{{ project.id }}/assignees/matrix"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <p class="loading">
+            <span class="loading-spinner"></span>
+            読み込み中...
+        </p>
+    </div>
+</div>
+{% endblock %}

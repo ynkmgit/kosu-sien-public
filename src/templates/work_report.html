@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% block title %}業務終了報告{% endblock %}
+{% block content %}
+{{ page_header(
+    title='業務終了報告',
+    icon='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    breadcrumbs=[
+        {'label': 'ホーム', 'href': '/'},
+        {'label': '業務終了報告'}
+    ]
+) }}
+
+<div class="report-card">
+    <div class="filter-row">
+        <div class="filter-group">
+            <label class="filter-label">ユーザー</label>
+            <div class="filter-tags" id="user-tags">
+                {% if selected_user_info %}
+                <span class="filter-tag" data-type="user" data-id="{{ selected_user_info.id }}">
+                    {{ selected_user_info.cd }} {{ selected_user_info.name }}
+                    <button type="button" class="tag-remove" onclick="removeUser()">×</button>
+                </span>
+                {% endif %}
+            </div>
+            {% if not selected_user %}
+            <div class="autocomplete-wrapper">
+                <input type="text" class="autocomplete-input" id="user-input"
+                       placeholder="ユーザーを検索..." autocomplete="off"
+                       oninput="handleAutocomplete(this)"
+                       onfocus="handleAutocomplete(this)"
+                       onblur="setTimeout(() => hideAutocomplete(), 200)">
+                <div class="autocomplete-dropdown" id="autocomplete-user"></div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">日付</label>
+            <input type="date" id="date-input" name="target_date" class="filter-input"
+                   value="{{ selected_date }}" onchange="updateUrl()">
+        </div>
+    </div>
+
+    {% if selected_user %}
+    <div class="summary-row">
+        <div class="summary-item">
+            <span class="summary-label">合計工数</span>
+            <span class="summary-value">{{ "%.2f"|format(total_hours) }}H</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="template-section">
+        <div class="template-header">
+            <label class="filter-label">テンプレート</label>
+            <div class="template-actions">
+                <button type="button" class="btn-small" onclick="saveTemplate()">保存</button>
+                <button type="button" class="btn-small btn-secondary" onclick="resetTemplate()">初期化</button>
+            </div>
+        </div>
+        <textarea id="template-textarea"
+                  name="template"
+                  class="template-textarea"
+                  hx-get="/work-report/preview"
+                  hx-trigger="input changed delay:300ms, load"
+                  hx-target="#report-preview"
+                  hx-include="#date-input, #hide-zero-progress"
+                  hx-vals='{"user": {{ selected_user or "null" }}}'
+        >{{ default_template }}</textarea>
+        <div class="template-options">
+            <label class="checkbox-label">
+                <input type="checkbox" id="hide-zero-progress" name="hide_zero_progress"
+                       hx-get="/work-report/preview"
+                       hx-trigger="change"
+                       hx-target="#report-preview"
+                       hx-include="#template-textarea, #date-input"
+                       hx-vals='{"user": {{ selected_user or "null" }}}'>
+                進捗0%は表示しない
+            </label>
+        </div>
+        <div class="template-help">
+            <strong>基本変数:</strong> <code>{total_hours}</code> <code>{date}</code> <code>{date_jp}</code> <code>{user_cd}</code> <code>{user_name}</code><br>
+            <strong>ループ行:</strong> <code>@project</code> <code>@issue</code> <code>@task</code> で始まる行は実績ごとに繰り返し<br>
+            <strong>ループ内変数:</strong> <code>{project_cd}</code> <code>{project_name}</code> <code>{issue_cd}</code> <code>{issue_name}</code> <code>{task_name}</code> <code>{progress}</code> <code>{hours}</code>
+        </div>
+    </div>
+
+    <div class="preview-section">
+        <div class="preview-header">
+            <span class="preview-label">プレビュー</span>
+            <button type="button" class="btn-copy" onclick="copyToClipboard()">コピー</button>
+        </div>
+        <div id="report-preview">
+            {% if selected_user and preview %}
+            <pre id="report-preview-text">{{ preview }}</pre>
+            {% else %}
+            <p class="empty-preview">ユーザーを選択すると報告書が生成されます</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// 定数
+const DEFAULT_TEMPLATE = {{ default_template|tojson }};
+const TEMPLATE_KEY = 'work_report_template';
+const OPTIONS_KEY = 'work_report_options';
+const currentUserId = {{ selected_user or 'null' }};
+
+// ページ読み込み時
+document.addEventListener('DOMContentLoaded', function() {
+    loadTemplate();
+    loadOptions();
+});
+
+// === API呼び出しヘルパー ===
+
+async function getSetting(key) {
+    if (!currentUserId) return null;
+    try {
+        const res = await fetch(`/api/user-settings/${currentUserId}/${key}`);
+        const data = await res.json();
+        return data.value;
+    } catch (e) {
+        console.error('設定取得エラー:', e);
+        return null;
+    }
+}
+
+async function saveSetting(key, value) {
+    if (!currentUserId) {
+        alert('ユーザーを選択してください');
+        return false;
+    }
+    try {
+        await fetch(`/api/user-settings/${currentUserId}/${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value })
+        });
+        return true;
+    } catch (e) {
+        console.error('設定保存エラー:', e);
+        return false;
+    }
+}
+
+async function deleteSetting(key) {
+    if (!currentUserId) return;
+    try {
+        await fetch(`/api/user-settings/${currentUserId}/${key}`, { method: 'DELETE' });
+    } catch (e) {
+        console.error('設定削除エラー:', e);
+    }
+}
+
+// === テンプレート永続化 ===
+
+async function saveTemplate() {
+    const template = document.getElementById('template-textarea').value;
+    if (await saveSetting(TEMPLATE_KEY, template)) {
+        alert('テンプレートを保存しました');
+    }
+}
+
+async function loadTemplate() {
+    const saved = await getSetting(TEMPLATE_KEY);
+    if (saved) {
+        document.getElementById('template-textarea').value = saved;
+    }
+}
+
+async function resetTemplate() {
+    if (confirm('テンプレートを初期状態に戻しますか？')) {
+        await deleteSetting(TEMPLATE_KEY);
+        document.getElementById('template-textarea').value = DEFAULT_TEMPLATE;
+        htmx.trigger('#template-textarea', 'input');
+    }
+}
+
+// === オプション永続化 ===
+
+async function saveOptions() {
+    const options = {
+        hideZeroProgress: document.getElementById('hide-zero-progress').checked
+    };
+    await saveSetting(OPTIONS_KEY, JSON.stringify(options));
+}
+
+async function loadOptions() {
+    const saved = await getSetting(OPTIONS_KEY);
+    if (saved) {
+        const options = JSON.parse(saved);
+        document.getElementById('hide-zero-progress').checked = options.hideZeroProgress || false;
+    }
+}
+
+// チェックボックス変更時に保存
+document.getElementById('hide-zero-progress').addEventListener('change', saveOptions);
+
+// === URL操作 ===
+
+function updateUrl() {
+    const targetDate = document.getElementById('date-input').value;
+    const params = new URLSearchParams();
+    if (currentUserId) params.set('user', currentUserId);
+    if (targetDate) params.set('target_date', targetDate);
+    window.location.href = '/work-report?' + params.toString();
+}
+
+function selectUser(userId) {
+    const targetDate = document.getElementById('date-input').value;
+    const params = new URLSearchParams();
+    params.set('user', userId);
+    if (targetDate) params.set('target_date', targetDate);
+    window.location.href = '/work-report?' + params.toString();
+}
+
+function removeUser() {
+    const targetDate = document.getElementById('date-input').value;
+    const params = new URLSearchParams();
+    if (targetDate) params.set('target_date', targetDate);
+    window.location.href = '/work-report?' + params.toString();
+}
+
+// === オートコンプリート ===
+
+let autocompleteTimeout = null;
+
+function handleAutocomplete(input) {
+    const dropdown = document.getElementById('autocomplete-user');
+    const query = input.value.trim();
+
+    clearTimeout(autocompleteTimeout);
+    autocompleteTimeout = setTimeout(() => {
+        const url = `/search/users?q=${encodeURIComponent(query)}`;
+
+        fetch(url)
+            .then(res => res.text())
+            .then(html => {
+                // onclickをselectUserに書き換え
+                dropdown.innerHTML = html.replace(/selectAutocomplete\('user', (\d+),/g, 'selectUser($1,');
+                dropdown.classList.add('show');
+            });
+    }, 150);
+}
+
+function hideAutocomplete() {
+    const dropdown = document.getElementById('autocomplete-user');
+    if (dropdown) dropdown.classList.remove('show');
+}
+
+// === クリップボード ===
+
+function copyToClipboard() {
+    const previewText = document.getElementById('report-preview-text');
+    if (!previewText) {
+        alert('コピーする内容がありません');
+        return;
+    }
+
+    const text = previewText.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('.btn-copy');
+        btn.textContent = 'コピー完了!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'コピー';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('コピーに失敗しました:', err);
+        alert('コピーに失敗しました');
+    });
+}
+</script>
+{% endblock %}

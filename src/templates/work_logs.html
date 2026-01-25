@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% block title %}実績入力{% endblock %}
+{% block content %}
+{{ page_header(
+    title='実績入力',
+    icon='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    breadcrumbs=[
+        {'label': 'ホーム', 'href': '/'},
+        {'label': '実績入力'}
+    ]
+) }}
+
+<div class="table-card">
+    <div class="table-header">
+        <span class="table-title">工数記録グリッド</span>
+        <span style="color: var(--text-muted); font-size: 0.85rem;">0.25h刻みで入力</span>
+    </div>
+    <div class="table-wrapper">
+        <div id="grid-container"
+             hx-get="/work-logs/grid?{% for u in selected_users %}user={{ u }}&{% endfor %}{% for p in selected_projects %}project={{ p }}&{% endfor %}{% for i in selected_issues %}issue={{ i }}&{% endfor %}view={{ view }}{% if view == 'week' and week_start %}&week={{ week_start }}{% elif view == 'month' and year_month %}&month={{ year_month }}{% endif %}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <p class="loading">
+                <span class="loading-spinner"></span>
+                読み込み中...
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+function buildUrl(users, projects, issues, view, dateParam) {
+    const params = new URLSearchParams();
+    users.forEach(u => params.append('user', u));
+    projects.forEach(p => params.append('project', p));
+    issues.forEach(i => params.append('issue', i));
+    params.set('view', view);
+    if (view === 'week') {
+        params.set('week', dateParam);
+    } else {
+        params.set('month', dateParam);
+    }
+    return '/work-logs?' + params.toString();
+}
+
+function getCurrentFilters() {
+    const url = new URL(window.location.href);
+    const users = url.searchParams.getAll('user').map(Number);
+    const projects = url.searchParams.getAll('project').map(Number);
+    const issues = url.searchParams.getAll('issue').map(Number);
+    const view = url.searchParams.get('view') || '{{ view }}';
+    const week = url.searchParams.get('week') || '{{ week_start or "" }}';
+    const month = url.searchParams.get('month') || '{{ year_month or "" }}';
+    return { users, projects, issues, view, week, month };
+}
+
+function addFilter(type, value) {
+    if (!value) return;
+    const { users, projects, issues, view, week, month } = getCurrentFilters();
+    if (type === 'user') {
+        if (!users.includes(Number(value))) users.push(Number(value));
+    } else if (type === 'project') {
+        if (!projects.includes(Number(value))) projects.push(Number(value));
+    } else if (type === 'issue') {
+        if (!issues.includes(Number(value))) issues.push(Number(value));
+    }
+    const dateParam = view === 'week' ? week : month;
+    window.location.href = buildUrl(users, projects, issues, view, dateParam);
+}
+
+function removeFilter(type, id) {
+    const { users, projects, issues, view, week, month } = getCurrentFilters();
+    if (type === 'user') {
+        const idx = users.indexOf(Number(id));
+        if (idx > -1) users.splice(idx, 1);
+    } else if (type === 'project') {
+        const idx = projects.indexOf(Number(id));
+        if (idx > -1) projects.splice(idx, 1);
+    } else if (type === 'issue') {
+        const idx = issues.indexOf(Number(id));
+        if (idx > -1) issues.splice(idx, 1);
+    }
+    const dateParam = view === 'week' ? week : month;
+    window.location.href = buildUrl(users, projects, issues, view, dateParam);
+}
+
+function changeWeek(newWeek) {
+    const { users, projects, issues } = getCurrentFilters();
+    window.location.href = buildUrl(users, projects, issues, 'week', newWeek);
+}
+
+function changeMonth(newMonth) {
+    const { users, projects, issues } = getCurrentFilters();
+    window.location.href = buildUrl(users, projects, issues, 'month', newMonth);
+}
+
+function changeView(newView) {
+    const { users, projects, issues, week, month } = getCurrentFilters();
+    if (newView === 'week') {
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + diff);
+        const weekStr = monday.toISOString().split('T')[0];
+        window.location.href = buildUrl(users, projects, issues, 'week', weekStr);
+    } else {
+        const today = new Date();
+        const monthStr = today.toISOString().slice(0, 7);
+        window.location.href = buildUrl(users, projects, issues, 'month', monthStr);
+    }
+}
+
+// オートコンプリート関連
+let autocompleteTimeout = null;
+
+function handleAutocomplete(input, type) {
+    const dropdown = document.getElementById('autocomplete-' + type);
+    const query = input.value.trim();
+    const { users, projects, issues } = getCurrentFilters();
+
+    // 既に選択済みのIDを除外
+    let excludeIds = [];
+    if (type === 'user') excludeIds = users;
+    else if (type === 'project') excludeIds = projects;
+    else if (type === 'issue') excludeIds = issues;
+
+    clearTimeout(autocompleteTimeout);
+    autocompleteTimeout = setTimeout(() => {
+        const excludeParams = excludeIds.map(id => 'exclude=' + id).join('&');
+        const url = `/search/${type}s?q=${encodeURIComponent(query)}&${excludeParams}`;
+
+        fetch(url)
+            .then(res => res.text())
+            .then(html => {
+                dropdown.innerHTML = html;
+                dropdown.classList.add('show');
+            });
+    }, 150);
+}
+
+function hideAutocomplete(type) {
+    const dropdown = document.getElementById('autocomplete-' + type);
+    if (dropdown) dropdown.classList.remove('show');
+}
+
+function selectAutocomplete(type, id, label) {
+    addFilter(type, id);
+}
+
+// === 折り畳み機能 ===
+
+// プロジェクト配下を折り畳み/展開
+function toggleProject(projectId) {
+    const projectRow = document.querySelector(`.project-row[data-project-id="${projectId}"]`);
+    const isFolded = projectRow.classList.toggle('folded');
+
+    // 配下の案件行と作業行を取得
+    const issueRows = document.querySelectorAll(`.issue-row[data-project-id="${projectId}"]`);
+    const logRows = document.querySelectorAll(`.log-row[data-project-id="${projectId}"]`);
+
+    if (isFolded) {
+        // 折り畳み: 案件・作業を全て非表示
+        issueRows.forEach(row => row.classList.add('collapsed', 'folded'));
+        logRows.forEach(row => row.classList.add('collapsed'));
+    } else {
+        // 展開: 案件は表示、作業は案件のfolded状態に応じて制御
+        issueRows.forEach(row => row.classList.remove('collapsed'));
+        logRows.forEach(row => {
+            const issueId = row.dataset.issueId;
+            const issueRow = document.querySelector(`.issue-row[data-project-id="${projectId}"][data-issue-id="${issueId}"]`);
+            if (issueRow && issueRow.classList.contains('folded')) {
+                row.classList.add('collapsed');
+            } else {
+                row.classList.remove('collapsed');
+            }
+        });
+    }
+}
+
+// 案件配下を折り畳み/展開
+function toggleIssue(projectId, issueId) {
+    const issueRow = document.querySelector(`.issue-row[data-project-id="${projectId}"][data-issue-id="${issueId}"]`);
+    const isFolded = issueRow.classList.toggle('folded');
+
+    // 配下の作業行を取得
+    const logRows = document.querySelectorAll(`.log-row[data-project-id="${projectId}"][data-issue-id="${issueId}"]`);
+    logRows.forEach(row => row.classList.toggle('collapsed', isFolded));
+}
+
+// 全て展開
+function expandAll() {
+    document.querySelectorAll('.project-row, .issue-row').forEach(row => {
+        row.classList.remove('folded');
+    });
+    document.querySelectorAll('.issue-row, .log-row').forEach(row => {
+        row.classList.remove('collapsed');
+    });
+}
+
+// 全て折り畳み
+function collapseAll() {
+    document.querySelectorAll('.project-row').forEach(row => {
+        row.classList.add('folded');
+    });
+    document.querySelectorAll('.issue-row').forEach(row => {
+        row.classList.add('collapsed', 'folded');
+    });
+    document.querySelectorAll('.log-row').forEach(row => {
+        row.classList.add('collapsed');
+    });
+}
+
+// 案件のみ表示（作業を折り畳み、PJ+案件まで表示）
+function collapseToIssues() {
+    // プロジェクト行: 表示、展開状態
+    document.querySelectorAll('.project-row').forEach(row => {
+        row.classList.remove('folded');
+    });
+    // 案件行: 表示、折り畳み状態（配下の作業を非表示）
+    document.querySelectorAll('.issue-row').forEach(row => {
+        row.classList.remove('collapsed');
+        row.classList.add('folded');
+    });
+    // 作業行: 非表示
+    document.querySelectorAll('.log-row').forEach(row => {
+        row.classList.add('collapsed');
+    });
+}
+</script>
+{% endblock %}

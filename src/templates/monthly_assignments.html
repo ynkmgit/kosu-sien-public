@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% block title %}月次アサイン{% endblock %}
+{% block content %}
+{{ page_header(
+    title='月次アサイン',
+    icon='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    breadcrumbs=[
+        {'label': 'ホーム', 'href': '/'},
+        {'label': '月次アサイン'}
+    ]
+) }}
+
+<div class="table-card">
+    <div class="table-header">
+        <span class="table-title">ユーザー × プロジェクト アサイン</span>
+        <span style="color: var(--text-muted); font-size: 0.85rem;">セルに時間(h)を入力、1人月 = 160h</span>
+    </div>
+    <div id="grid-container"
+         hx-get="/monthly-assignments/grid?month={{ year_month }}&mode={{ mode }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <p class="loading">
+            <span class="loading-spinner"></span>
+            読み込み中...
+        </p>
+    </div>
+</div>
+{% endblock %}

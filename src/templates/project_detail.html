@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block content %}
+{{ page_header(
+    title=project.cd ~ ' ' ~ project.name,
+    icon='M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
+    breadcrumbs=[
+        {'label': 'プロジェクト一覧', 'href': '/projects'},
+        {'label': project.name}
+    ],
+    description=project.description
+) }}
+
+<div class="project-subnav">
+    <a href="/projects/{{ project.id }}/issues" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        案件
+    </a>
+    <a href="/projects/{{ project.id }}/assignees" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        担当割当
+    </a>
+    <a href="/projects/{{ project.id }}/statuses" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        設定
+    </a>
+</div>
+
+<div class="summary-cards">
+    <div class="summary-card">
+        <div class="summary-label">案件数</div>
+        <div class="summary-value">{{ summary.issue_count }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">作業数</div>
+        <div class="summary-value">{{ summary.task_count }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">見積合計</div>
+        <div class="summary-value">{{ "%.1f"|format(summary.estimate_total) }}h</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">実績合計</div>
+        <div class="summary-value">{{ "%.1f"|format(summary.actual_total) }}h</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">消化率</div>
+        <div class="summary-value {% if summary.consumption_rate >= 100 %}rate-over{% elif summary.consumption_rate >= 80 %}rate-warning{% endif %}">{{ "%.0f"|format(summary.consumption_rate) }}%</div>
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-header">
+        <span class="table-title">最近の案件</span>
+        <a href="/projects/{{ project.id }}/issues" class="btn btn-ghost" style="font-size: 0.85rem;">
+            すべて表示
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
+    </div>
+    <table class="recent-issues-table">
+        <thead>
+            <tr>
+                <th class="col-cd">CD</th>
+                <th>案件名</th>
+                <th class="col-sort">ステータス</th>
+                <th class="col-value">見積</th>
+                <th class="col-value">実績</th>
+                <th class="col-actions-md">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if recent_issues %}
+                {% for issue in recent_issues %}
+                <tr>
+                    <td class="cd-cell">{{ issue.cd }}</td>
+                    <td class="name-cell">{{ issue.name }}</td>
+                    <td><span class="status-badge status-{{ issue.status }}">{{ issue.status_name }}</span></td>
+                    <td style="text-align: right;">{{ "%.1f"|format(issue.estimate) }}h</td>
+                    <td style="text-align: right;">{{ "%.1f"|format(issue.actual) }}h</td>
+                    <td>
+                        <div class="actions-cell">
+                            <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks" class="btn btn-sm btn-ghost">作業</a>
+                            <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/estimates" class="btn btn-sm btn-ghost">見積</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" class="empty-message" style="text-align: center; padding: 40px; color: var(--text-muted);">案件がありません</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

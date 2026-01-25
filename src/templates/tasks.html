@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from 'macros/page_header.html' import page_header %}
+{% from 'macros/forms.html' import loading_row, form_card_header, add_button %}
+{% block title %}作業管理 - {{ issue.name }}{% endblock %}
+{% block content %}
+{{ page_header(
+    title=issue.name ~ ' - 作業管理',
+    icon='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+    breadcrumbs=[
+        {'label': 'プロジェクト一覧', 'href': '/projects'},
+        {'label': project.name, 'href': '/projects/' ~ project.id},
+        {'label': '案件', 'href': '/projects/' ~ project.id ~ '/issues'},
+        {'label': issue.name ~ ' - 作業'}
+    ]
+) }}
+
+<div class="form-card">
+    {{ form_card_header('新規作業追加') }}
+    <form class="add-form" hx-post="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks" hx-target="#task-table tbody" hx-swap="beforeend" hx-on::after-request="this.reset()">
+        <div class="form-group">
+            <label class="form-label">CD</label>
+            <input type="text" name="cd" placeholder="T001" required class="form-input input-cd">
+        </div>
+        <div class="form-group">
+            <label class="form-label">作業名</label>
+            <input type="text" name="name" placeholder="作業名を入力" required class="form-input">
+        </div>
+        <div class="form-group">
+            <label class="form-label">説明</label>
+            <input type="text" name="description" placeholder="作業の説明" class="form-input">
+        </div>
+        {{ add_button() }}
+    </form>
+</div>
+
+<div class="table-card">
+    <div class="table-header">
+        <span class="table-title">登録済み作業</span>
+        <input type="search" name="q" placeholder="検索..." class="search-input"
+               hx-get="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks/list" hx-trigger="keyup changed delay:300ms"
+               hx-target="#task-table" hx-swap="innerHTML">
+    </div>
+    <table id="task-table" hx-get="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks/list?sort=cd&order=asc" hx-trigger="load" hx-target="#task-table" hx-swap="innerHTML">
+        <thead>
+            <tr>
+                <th class="col-cd">CD</th>
+                <th class="col-name-lg">作業名</th>
+                <th>説明</th>
+                <th class="col-actions-sm">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ loading_row(4) }}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

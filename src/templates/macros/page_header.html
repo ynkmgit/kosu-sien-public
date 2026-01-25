@@ -1,0 +1,43 @@
+{# ページヘッダーマクロ
+
+使用例:
+{% from 'macros/page_header.html' import page_header %}
+{{ page_header(
+    title='ユーザー管理',
+    icon='M12 4.354a4 4 0 110 5.292...',
+    breadcrumbs=[
+        {'label': 'ホーム', 'href': '/'},
+        {'label': 'ユーザー'}
+    ]
+) }}
+#}
+
+{% macro page_header(title, icon, breadcrumbs, description=None) %}
+<div class="page-header">
+    <div class="breadcrumb">
+        {% for crumb in breadcrumbs %}
+            {% if loop.last %}
+                <span class="breadcrumb-current">{{ crumb.label }}</span>
+            {% else %}
+                {% if crumb.href %}
+                    <a href="{{ crumb.href }}">{{ crumb.label }}</a>
+                {% else %}
+                    <span class="breadcrumb-current">{{ crumb.label }}</span>
+                {% endif %}
+                <span class="breadcrumb-sep">/</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <h1 class="page-title">
+        <div class="page-title-icon">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="{{ icon }}"/>
+            </svg>
+        </div>
+        {{ title }}
+    </h1>
+    {% if description %}
+    <p class="page-description">{{ description }}</p>
+    {% endif %}
+</div>
+{% endmacro %}
