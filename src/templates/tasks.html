@@ -1,57 +1,106 @@
 {% extends "base.html" %}
 {% from 'macros/page_header.html' import page_header %}
-{% from 'macros/forms.html' import loading_row, form_card_header, add_button %}
+{% from 'macros/forms.html' import loading_row, add_button %}
 {% block title %}作業管理 - {{ issue.name }}{% endblock %}
 {% block content %}
 {{ page_header(
-    title=issue.name ~ ' - 作業管理',
+    title=issue.cd ~ ' ' ~ issue.name,
     icon='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
     breadcrumbs=[
-        {'label': 'プロジェクト一覧', 'href': '/projects'},
-        {'label': project.name, 'href': '/projects/' ~ project.id},
-        {'label': '案件', 'href': '/projects/' ~ project.id ~ '/issues'},
-        {'label': issue.name ~ ' - 作業'}
+        {'label': 'プロジェクト', 'href': '/projects/' ~ project.id},
+        {'label': issue.name ~ ' - 作業管理'}
     ]
 ) }}
 
-<div class="form-card">
-    {{ form_card_header('新規作業追加') }}
-    <form class="add-form" hx-post="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks" hx-target="#task-table tbody" hx-swap="beforeend" hx-on::after-request="this.reset()">
-        <div class="form-group">
-            <label class="form-label">CD</label>
-            <input type="text" name="cd" placeholder="T001" required class="form-input input-cd">
-        </div>
-        <div class="form-group">
-            <label class="form-label">作業名</label>
-            <input type="text" name="name" placeholder="作業名を入力" required class="form-input">
-        </div>
-        <div class="form-group">
-            <label class="form-label">説明</label>
-            <input type="text" name="description" placeholder="作業の説明" class="form-input">
-        </div>
-        {{ add_button() }}
-    </form>
+<div class="project-subnav">
+    <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks" class="subnav-link active">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        作業管理
+    </a>
+    <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/estimates" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        見積内訳
+    </a>
+    <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/task-statuses" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        作業ステータス設定
+    </a>
+    <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/issue-tags" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+        </svg>
+        タグ設定
+    </a>
+</div>
+
+<!-- 案件サマリー -->
+<div class="summary-cards summary-cards-compact">
+    <div class="summary-card">
+        <div class="summary-label">計画</div>
+        <div class="summary-value">{{ "%.1f"|format(totals.internal_plan_total or 0) }}h</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">実績</div>
+        <div class="summary-value">{{ "%.1f"|format(totals.actual_total or 0) }}h</div>
+    </div>
+    {% set remaining = (totals.internal_plan_total or 0) - (totals.actual_total or 0) %}
+    <div class="summary-card">
+        <div class="summary-label">残</div>
+        <div class="summary-value {% if remaining < 0 %}rate-over{% endif %}">{{ "%.1f"|format(remaining) }}h</div>
+    </div>
 </div>
 
 <div class="table-card">
     <div class="table-header">
-        <span class="table-title">登録済み作業</span>
-        <input type="search" name="q" placeholder="検索..." class="search-input"
-               hx-get="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks/list" hx-trigger="keyup changed delay:300ms"
-               hx-target="#task-table" hx-swap="innerHTML">
+        <span class="table-title">作業一覧</span>
+        <div class="header-actions">
+            <button type="button" class="btn btn-primary btn-sm add-toggle" onclick="toggleAddForm(this)">+ 追加</button>
+        </div>
     </div>
-    <table id="task-table" hx-get="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks/list?sort=cd&order=asc" hx-trigger="load" hx-target="#task-table" hx-swap="innerHTML">
+    <div class="inline-add-row hidden">
+        <form class="add-form" hx-post="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks" hx-target="#task-table tbody" hx-swap="beforeend" hx-on::after-request="this.reset(); hideAddForm(this);">
+            <div class="form-group form-group-narrow">
+                <label class="form-label">CD</label>
+                <input type="text" name="cd" placeholder="T001" required class="form-input">
+            </div>
+            <div class="form-group form-group-wide">
+                <label class="form-label">作業名</label>
+                <input type="text" name="name" placeholder="作業名を入力" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">ステータス</label>
+                <select name="status" class="form-input input-select">
+                    {% for code, name in status_labels.items() %}
+                    <option value="{{ code }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {{ add_button() }}
+        </form>
+    </div>
+    <table id="task-table" hx-get="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks/list" hx-trigger="load" hx-target="#task-table" hx-swap="innerHTML">
         <thead>
             <tr>
                 <th class="col-cd">CD</th>
-                <th class="col-name-lg">作業名</th>
-                <th>説明</th>
+                <th class="col-name">作業名</th>
+                <th class="col-sort">ステータス</th>
+                <th>タグ</th>
+                <th class="col-value">計画</th>
+                <th class="col-value">実績</th>
+                <th class="col-sort">進捗</th>
                 <th class="col-actions-sm">操作</th>
             </tr>
         </thead>
         <tbody>
-            {{ loading_row(4) }}
+            {{ loading_row(8) }}
         </tbody>
     </table>
 </div>
+
 {% endblock %}

@@ -38,8 +38,7 @@ def create_issue(body: IssueCreate):
         project_id=body.project_id,
         cd=body.cd,
         name=body.name,
-        status=body.status,
-        description=body.description
+        status=body.status
     )
 
 
@@ -50,8 +49,7 @@ def update_issue(issue_id: int, body: IssueUpdate):
         issue_id=issue_id,
         cd=body.cd,
         name=body.name,
-        status=body.status,
-        description=body.description
+        status=body.status
     )
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")

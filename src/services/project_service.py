@@ -2,7 +2,10 @@
 
 責務: プロジェクトのデータ操作のみ
 """
+import sqlite3
+
 from database import get_db, create_default_statuses
+from exceptions import DuplicateCodeError
 
 
 class ProjectService:
@@ -45,10 +48,13 @@ class ProjectService:
     def create(cd: str, name: str, description: str = "") -> dict:
         """プロジェクト作成"""
         with get_db() as conn:
-            cur = conn.execute(
-                "INSERT INTO project (cd, name, description) VALUES (?, ?, ?)",
-                (cd, name, description)
-            )
+            try:
+                cur = conn.execute(
+                    "INSERT INTO project (cd, name, description) VALUES (?, ?, ?)",
+                    (cd, name, description)
+                )
+            except sqlite3.IntegrityError:
+                raise DuplicateCodeError(f"プロジェクトCD '{cd}' は既に使用されています")
             project_id = cur.lastrowid
             create_default_statuses(conn, project_id)
             row = conn.execute("SELECT * FROM project WHERE id = ?", (project_id,)).fetchone()
@@ -58,10 +64,13 @@ class ProjectService:
     def update(project_id: int, cd: str, name: str, description: str = "") -> dict | None:
         """プロジェクト更新"""
         with get_db() as conn:
-            cur = conn.execute(
-                "UPDATE project SET cd = ?, name = ?, description = ? WHERE id = ?",
-                (cd, name, description, project_id)
-            )
+            try:
+                cur = conn.execute(
+                    "UPDATE project SET cd = ?, name = ?, description = ? WHERE id = ?",
+                    (cd, name, description, project_id)
+                )
+            except sqlite3.IntegrityError:
+                raise DuplicateCodeError(f"プロジェクトCD '{cd}' は既に使用されています")
             if cur.rowcount == 0:
                 return None
             row = conn.execute("SELECT * FROM project WHERE id = ?", (project_id,)).fetchone()
@@ -113,20 +122,3 @@ class ProjectService:
             "actual_total": actual_total,
             "consumption_rate": round(consumption_rate, 1),
         }
-
-    @staticmethod
-    def get_recent_issues(project_id: int, limit: int = 5) -> list[dict]:
-        """最近の案件取得（見積・実績付き）"""
-        with get_db() as conn:
-            issues = conn.execute(
-                """SELECT i.*, ps.name as status_name,
-                          COALESCE((SELECT SUM(hours) FROM issue_estimate_item WHERE issue_id = i.id), 0) as estimate,
-                          COALESCE((SELECT SUM(w.hours) FROM work_log w JOIN task t ON w.task_id = t.id WHERE t.issue_id = i.id), 0) as actual
-                   FROM issue i
-                   LEFT JOIN project_status ps ON i.project_id = ps.project_id AND i.status = ps.code
-                   WHERE i.project_id = ?
-                   ORDER BY i.id DESC
-                   LIMIT ?""",
-                (project_id, limit)
-            ).fetchall()
-        return [dict(row) for row in issues]

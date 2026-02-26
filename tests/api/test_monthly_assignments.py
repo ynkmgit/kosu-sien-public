@@ -12,8 +12,7 @@ def user_id(client):
     unique_cd = f"MA-{uuid.uuid4().hex[:6]}"
     response = client.post("/users", data={
         "cd": unique_cd,
-        "name": "月次テストユーザー",
-        "email": f"{unique_cd}@test.example.com"
+        "name": "月次テストユーザー"
     })
     match = re.search(r'id="user-(\d+)"', response.text)
     return int(match.group(1))
@@ -26,8 +25,7 @@ def project_id(client):
     unique_cd = f"PJ-{uuid.uuid4().hex[:6]}"
     response = client.post("/projects", data={
         "cd": unique_cd,
-        "name": "月次テストPJ",
-        "description": ""
+        "name": "月次テストPJ"
     })
     match = re.search(r'id="project-(\d+)"', response.text)
     return int(match.group(1))
@@ -39,8 +37,8 @@ def inactive_user_id():
     unique_cd = f"MA-{uuid.uuid4().hex[:6]}"
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO user (cd, name, email, is_active) VALUES (?, ?, ?, 0)",
-            (unique_cd, "無効ユーザー", f"{unique_cd}@test.example.com")
+            "INSERT INTO user (cd, name, is_active) VALUES (?, ?, 0)",
+            (unique_cd, "無効ユーザー")
         )
         return cursor.lastrowid
 

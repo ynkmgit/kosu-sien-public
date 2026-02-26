@@ -2,7 +2,10 @@
 
 責務: 案件のデータ操作のみ
 """
-from database import get_db
+import sqlite3
+
+from database import get_db, create_default_task_statuses
+from exceptions import DuplicateCodeError
 
 
 class IssueService:
@@ -11,7 +14,7 @@ class IssueService:
     @staticmethod
     def get_all(project_id: int = None, sort: str = "cd", order: str = "asc", q: str = "") -> list[dict]:
         """案件一覧を取得"""
-        allowed_sorts = {"cd", "name", "description", "status"}
+        allowed_sorts = {"cd", "name", "status"}
         if sort not in allowed_sorts:
             sort = "cd"
         order_dir = "DESC" if order.lower() == "desc" else "ASC"
@@ -26,8 +29,8 @@ class IssueService:
 
             if q:
                 like = f"%{q}%"
-                conditions.append("(i.cd LIKE ? OR i.name LIKE ? OR i.description LIKE ?)")
-                params.extend([like, like, like])
+                conditions.append("(i.cd LIKE ? OR i.name LIKE ?)")
+                params.extend([like, like])
 
             where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -81,30 +84,39 @@ class IssueService:
         return [dict(r) for r in rows]
 
     @staticmethod
-    def create(project_id: int, cd: str, name: str, status: str = "open", description: str = "") -> dict:
+    def create(project_id: int, cd: str, name: str, status: str = "open") -> dict:
         """案件作成"""
         with get_db() as conn:
-            cur = conn.execute(
-                "INSERT INTO issue (cd, project_id, name, status, description) VALUES (?, ?, ?, ?, ?)",
-                (cd, project_id, name, status, description)
-            )
+            try:
+                cur = conn.execute(
+                    "INSERT INTO issue (cd, project_id, name, status) VALUES (?, ?, ?, ?)",
+                    (cd, project_id, name, status)
+                )
+            except sqlite3.IntegrityError:
+                raise DuplicateCodeError(f"案件CD '{cd}' はこのプロジェクト内で既に使用されています")
+            issue_id = cur.lastrowid
+            # デフォルト作業ステータスを作成
+            create_default_task_statuses(conn, issue_id)
             row = conn.execute(
                 """SELECT i.*, p.cd as project_cd, p.name as project_name
                    FROM issue i
                    JOIN project p ON i.project_id = p.id
                    WHERE i.id = ?""",
-                (cur.lastrowid,)
+                (issue_id,)
             ).fetchone()
         return dict(row)
 
     @staticmethod
-    def update(issue_id: int, cd: str, name: str, status: str, description: str = "") -> dict | None:
+    def update(issue_id: int, cd: str, name: str, status: str) -> dict | None:
         """案件更新"""
         with get_db() as conn:
-            cur = conn.execute(
-                "UPDATE issue SET cd = ?, name = ?, status = ?, description = ? WHERE id = ?",
-                (cd, name, status, description, issue_id)
-            )
+            try:
+                cur = conn.execute(
+                    "UPDATE issue SET cd = ?, name = ?, status = ? WHERE id = ?",
+                    (cd, name, status, issue_id)
+                )
+            except sqlite3.IntegrityError:
+                raise DuplicateCodeError(f"案件CD '{cd}' はこのプロジェクト内で既に使用されています")
             if cur.rowcount == 0:
                 return None
             row = conn.execute(
@@ -188,7 +200,7 @@ class IssueService:
     @staticmethod
     def get_all_with_totals(project_id: int, sort: str = "cd", order: str = "asc", q: str = "") -> list[dict]:
         """案件一覧を見積/実績合計付きで取得（1クエリで効率的に取得）"""
-        allowed_sorts = {"cd", "name", "description", "status"}
+        allowed_sorts = {"cd", "name", "status"}
         if sort not in allowed_sorts:
             sort = "cd"
         order_dir = "DESC" if order.lower() == "desc" else "ASC"
@@ -199,8 +211,8 @@ class IssueService:
 
             if q:
                 like = f"%{q}%"
-                conditions.append("(i.cd LIKE ? OR i.name LIKE ? OR i.description LIKE ?)")
-                params.extend([like, like, like])
+                conditions.append("(i.cd LIKE ? OR i.name LIKE ?)")
+                params.extend([like, like])
 
             where = f"WHERE {' AND '.join(conditions)}"
 

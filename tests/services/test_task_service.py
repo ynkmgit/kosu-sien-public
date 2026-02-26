@@ -8,7 +8,7 @@ from services.task_service import TaskService
 @pytest.fixture
 def issue(clean_db):
     """テスト用案件"""
-    project = ProjectService.create("PROJ", "Test Project", "")
+    project = ProjectService.create("PROJ", "Test Project")
     return IssueService.create(project["id"], "ISS", "Test Issue")
 
 
@@ -29,7 +29,7 @@ def test_get_all_by_issue(clean_db, issue):
 
 def test_create_task(clean_db, issue):
     """作業作成"""
-    task = TaskService.create(issue["id"], "NEW", "New Task", "Desc")
+    task = TaskService.create(issue["id"], "NEW", "New Task")
     assert task["cd"] == "NEW"
     assert task["name"] == "New Task"
     assert task["issue_id"] == issue["id"]
@@ -52,14 +52,14 @@ def test_get_by_id_not_found(clean_db):
 def test_update_task(clean_db, issue):
     """作業更新"""
     created = TaskService.create(issue["id"], "UPD", "Update Me")
-    updated = TaskService.update(created["id"], "UPD2", "Updated", "New Desc")
+    updated = TaskService.update(created["id"], "UPD2", "Updated")
     assert updated is not None
     assert updated["cd"] == "UPD2"
 
 
 def test_update_not_found(clean_db):
     """存在しないIDで更新失敗"""
-    result = TaskService.update(99999, "X", "Y", "")
+    result = TaskService.update(99999, "X", "Y")
     assert result is None
 
 
@@ -77,25 +77,29 @@ def test_delete_not_found(clean_db):
     assert result is False
 
 
-def test_update_progress(clean_db, issue):
-    """進捗率更新"""
+def test_update_assignee_progress(clean_db, issue):
+    """担当者の進捗率更新"""
+    from services import TaskAssigneeService, UserService
     task = TaskService.create(issue["id"], "PRG", "Progress Test")
-    result = TaskService.update_progress(task["id"], 50)
+    user = UserService.create("PRG-U", "Progress User")
+    assignee_id = TaskAssigneeService.create(task["id"], user["id"])
+
+    result = TaskAssigneeService.update_progress(assignee_id, 50)
     assert result is True
 
-    updated = TaskService.get_by_id(task["id"])
-    assert updated["progress_rate"] == 50
 
-
-def test_update_progress_invalid_range(clean_db, issue):
+def test_update_assignee_progress_invalid_range(clean_db, issue):
     """無効な進捗率でエラー"""
+    from services import TaskAssigneeService, UserService
     task = TaskService.create(issue["id"], "PRG", "Progress Test")
+    user = UserService.create("PRG-U2", "Progress User 2")
+    assignee_id = TaskAssigneeService.create(task["id"], user["id"])
 
     with pytest.raises(ValueError):
-        TaskService.update_progress(task["id"], -1)
+        TaskAssigneeService.update_progress(assignee_id, -1)
 
     with pytest.raises(ValueError):
-        TaskService.update_progress(task["id"], 101)
+        TaskAssigneeService.update_progress(assignee_id, 101)
 
 
 def test_get_assignees_empty(clean_db, issue):

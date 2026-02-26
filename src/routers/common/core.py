@@ -1,14 +1,16 @@
 """共通コア機能
 
-責務: templates, 404ヘルパー, ソート検証, 消化率, 検索ユーティリティ
+責務: templates初期化, 404ヘルパー, フィルタークエリ生成, 消化率計算
 """
+import os
 from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.templating import Jinja2Templates
 from services import ProjectService, IssueService, UserService, UserAttributeTypeService
 
-templates = Jinja2Templates(directory=Path(__file__).parent.parent.parent / "templates")
+_BASE_DIR = Path(__file__).parent.parent.parent
+templates = Jinja2Templates(directory=_BASE_DIR / "templates")
 
 
 # === フィルタークエリ生成 ===
@@ -17,23 +19,40 @@ def build_filter_query(filter_params: dict) -> str:
     """フィルターパラメータからクエリ文字列を生成
 
     Args:
-        filter_params: {"user": [1,2], "project": [3], "issue": []}
+        filter_params: {"user": [1,2], "project": [3], "issue": [], ...}
 
     Returns:
         "?user=1&user=2&project=3" or "" (空の場合)
     """
     parts = []
-    for u in filter_params.get('user', []):
-        parts.append(f'user={u}')
-    for p in filter_params.get('project', []):
-        parts.append(f'project={p}')
-    for i in filter_params.get('issue', []):
-        parts.append(f'issue={i}')
+    for key in ('user', 'project', 'issue', 'tag', 'issue_status', 'task_status'):
+        for v in filter_params.get(key, []):
+            parts.append(f'{key}={v}')
+    if filter_params.get('exclude_done_issue'):
+        parts.append('exclude_done_issue=true')
+    if filter_params.get('exclude_done_task'):
+        parts.append('exclude_done_task=true')
+    fold = filter_params.get('fold', '')
+    if fold:
+        parts.append(f'fold={fold}')
     return '?' + '&'.join(parts) if parts else ''
 
 
 # Jinja2グローバル関数として登録
 templates.env.globals['filter_qs'] = build_filter_query
+
+
+def _static_url(path: str) -> str:
+    """キャッシュバスティング付き静的ファイルURL"""
+    full = _BASE_DIR / "static" / path
+    try:
+        mtime = int(os.path.getmtime(full))
+    except OSError:
+        mtime = 0
+    return f"/static/{path}?v={mtime}"
+
+
+templates.env.globals['static_url'] = _static_url
 
 
 # === 404ヘルパー ===
@@ -71,21 +90,6 @@ def get_attribute_type_or_404(type_id: int):
     return t
 
 
-# === ソートユーティリティ ===
-
-def validate_sort_params(
-    sort: str,
-    order: str,
-    allowed_cols: set,
-    default_col: str = "cd"
-) -> tuple[str, str]:
-    """ソートパラメータを検証し、(sort_col, order_dir)を返す"""
-    sort = sort if sort in allowed_cols else default_col
-    order = order if order in {"asc", "desc"} else "asc"
-    order_dir = "DESC" if order == "desc" else "ASC"
-    return sort, order_dir
-
-
 # === 消化率ユーティリティ ===
 
 def get_rate_class(rate: float) -> str:
@@ -100,19 +104,3 @@ def get_rate_class(rate: float) -> str:
         return "rate-danger"
     else:
         return "rate-critical"
-
-
-# === 検索ユーティリティ ===
-
-def build_like_params(q: str, count: int = 3) -> tuple[str, tuple]:
-    """LIKE検索用のパターンとパラメータを生成
-
-    Args:
-        q: 検索文字列
-        count: LIKEパラメータの数
-
-    Returns:
-        (like_pattern, params_tuple)
-    """
-    like = f"%{q}%"
-    return like, tuple(like for _ in range(count))

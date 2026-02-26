@@ -13,8 +13,7 @@ def issue_id(client):
     response = client.post("/projects/1/issues", data={
         "cd": unique_cd,
         "name": "担当割当テスト用案件",
-        "status": "open",
-        "description": ""
+        "status": "open"
     })
     match = re.search(r'id="issue-(\d+)"', response.text)
     return int(match.group(1))
@@ -26,8 +25,7 @@ def task_id(client, issue_id):
     unique_cd = f"T-{uuid.uuid4().hex[:6]}"
     response = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
         "cd": unique_cd,
-        "name": "担当割当テスト用作業",
-        "description": ""
+        "name": "担当割当テスト用作業"
     })
     match = re.search(r'id="task-(\d+)"', response.text)
     return int(match.group(1))
@@ -39,8 +37,7 @@ def user_id(client):
     unique_cd = f"U-{uuid.uuid4().hex[:6]}"
     response = client.post("/users", data={
         "cd": unique_cd,
-        "name": "担当テストユーザー",
-        "email": f"{unique_cd}@test.example.com"
+        "name": "担当テストユーザー"
     })
     match = re.search(r'id="user-(\d+)"', response.text)
     return int(match.group(1))
@@ -52,8 +49,8 @@ def inactive_user_id():
     unique_cd = f"U-{uuid.uuid4().hex[:6]}"
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO user (cd, name, email, is_active) VALUES (?, ?, ?, 0)",
-            (unique_cd, "無効ユーザー", f"{unique_cd}@test.example.com")
+            "INSERT INTO user (cd, name, is_active) VALUES (?, ?, 0)",
+            (unique_cd, "無効ユーザー")
         )
         return cursor.lastrowid
 
@@ -228,12 +225,12 @@ class TestAssigneeDelete:
         assert response.status_code == 404
 
 
-class TestIssueListAssigneeLink:
-    """案件一覧の担当割当リンクテスト"""
+class TestProjectDetailAssigneeLink:
+    """プロジェクト詳細画面の担当割当リンクテスト"""
 
-    def test_issue_page_has_assignee_link(self, client):
-        """案件ページに担当割当リンクが表示される"""
-        response = client.get("/projects/1/issues")
+    def test_project_detail_has_assignee_link(self, client):
+        """プロジェクト詳細に担当割当リンクが表示される"""
+        response = client.get("/projects/1")
         assert response.status_code == 200
         assert "/projects/1/assignees" in response.text
         assert "担当割当" in response.text

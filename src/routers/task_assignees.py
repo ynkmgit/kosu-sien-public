@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import TaskAssigneeService, UserService
-from .common import templates, get_project_or_404
+from .common import templates, get_project_or_404, FilterParams, get_filter_params
 
 router = APIRouter(prefix="/projects/{project_id}/assignees", tags=["task_assignees"])
 
@@ -135,19 +135,12 @@ def _sort_rows_with_issue_headers(rows):
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    project_id: int,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
+def page(request: Request, project_id: int, filters: FilterParams = Depends(get_filter_params)):
     proj = get_project_or_404(project_id)
-    filter_params = {"user": user, "project": project, "issue": issue}
     return templates.TemplateResponse(request, "task_assignees.html", {
         "active": "projects",
         "project": proj,
-        "filter_params": filter_params,
+        "filter_params": filters.to_dict(),
     })
 
 

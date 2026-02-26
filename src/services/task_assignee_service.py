@@ -57,7 +57,7 @@ class TaskAssigneeService:
         """ユーザーの存在確認と有効状態を取得"""
         with get_db() as conn:
             row = conn.execute(
-                "SELECT id, is_active FROM user WHERE id = ?",
+                "SELECT id, cd, name, is_active FROM user WHERE id = ?",
                 (user_id,)
             ).fetchone()
         return dict(row) if row else None
@@ -86,6 +86,16 @@ class TaskAssigneeService:
         return dict(row) if row else None
 
     @staticmethod
+    def get_assignment_by_id(assignment_id: int) -> dict | None:
+        """割当IDで取得"""
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id, task_id, user_id FROM task_assignee WHERE id = ?",
+                (assignment_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
     def create(task_id: int, user_id: int) -> int:
         """担当割当作成"""
         with get_db() as conn:
@@ -100,6 +110,18 @@ class TaskAssigneeService:
         """担当割当削除"""
         with get_db() as conn:
             cur = conn.execute("DELETE FROM task_assignee WHERE id = ?", (assignment_id,))
+        return cur.rowcount > 0
+
+    @staticmethod
+    def update_progress(assignee_id: int, progress_rate: int | None) -> bool:
+        """担当割当の進捗率を更新"""
+        if progress_rate is not None and (progress_rate < 0 or progress_rate > 100):
+            raise ValueError("進捗率は0-100の範囲で入力してください")
+        with get_db() as conn:
+            cur = conn.execute(
+                "UPDATE task_assignee SET progress_rate = ? WHERE id = ?",
+                (progress_rate, assignee_id)
+            )
         return cur.rowcount > 0
 
     @staticmethod

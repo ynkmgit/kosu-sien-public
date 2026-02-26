@@ -151,7 +151,7 @@ def test_is_in_use_true(clean_db):
         option_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
         # ユーザーを作成
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U1', 'User1', 'u1@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U1', 'User1')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
         # ユーザー属性を設定

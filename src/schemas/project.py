@@ -6,14 +6,12 @@ class ProjectCreate(BaseModel):
     """プロジェクト作成"""
     cd: str
     name: str
-    description: str = ""
 
 
 class ProjectUpdate(BaseModel):
     """プロジェクト更新"""
     cd: str
     name: str
-    description: str = ""
 
 
 class ProjectOut(BaseModel):
@@ -21,7 +19,6 @@ class ProjectOut(BaseModel):
     id: int
     cd: str
     name: str
-    description: str | None
 
     model_config = ConfigDict(from_attributes=True)
 

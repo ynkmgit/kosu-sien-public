@@ -7,7 +7,7 @@ from services.issue_service import IssueService
 @pytest.fixture
 def project(clean_db):
     """テスト用プロジェクト"""
-    return ProjectService.create("PROJ", "Test Project", "")
+    return ProjectService.create("PROJ", "Test Project")
 
 
 def test_get_all(clean_db, project):
@@ -27,7 +27,7 @@ def test_get_all_by_project(clean_db, project):
 
 def test_create_issue(clean_db, project):
     """案件作成"""
-    issue = IssueService.create(project["id"], "NEW", "New Issue", "open", "Desc")
+    issue = IssueService.create(project["id"], "NEW", "New Issue", "open")
     assert issue["cd"] == "NEW"
     assert issue["name"] == "New Issue"
     assert issue["status"] == "open"
@@ -51,7 +51,7 @@ def test_get_by_id_not_found(clean_db):
 def test_update_issue(clean_db, project):
     """案件更新"""
     created = IssueService.create(project["id"], "UPD", "Update Me")
-    updated = IssueService.update(created["id"], "UPD2", "Updated", "closed", "New Desc")
+    updated = IssueService.update(created["id"], "UPD2", "Updated", "closed")
     assert updated is not None
     assert updated["cd"] == "UPD2"
     assert updated["status"] == "closed"
@@ -59,7 +59,7 @@ def test_update_issue(clean_db, project):
 
 def test_update_not_found(clean_db):
     """存在しないIDで更新失敗"""
-    result = IssueService.update(99999, "X", "Y", "open", "")
+    result = IssueService.update(99999, "X", "Y", "open")
     assert result is None
 
 

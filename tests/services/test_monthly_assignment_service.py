@@ -7,7 +7,7 @@ from database import get_db
 def _setup_user_and_project():
     """テスト用ユーザー・プロジェクト作成"""
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('MA_USER', 'MA User', 'ma@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('MA_USER', 'MA User')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute("INSERT INTO project (cd, name) VALUES ('MA_PROJ', 'MA Project')")
         project_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]

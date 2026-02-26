@@ -222,9 +222,9 @@ class TestIssueListEstimateColumn:
         assert response.status_code == 200
         assert "40.0h" in response.text  # 16 + 24 = 40
 
-    def test_issue_list_shows_estimate_link(self, client, issue_id):
-        """案件一覧に見積リンクが表示される"""
+    def test_issue_list_shows_task_management_link(self, client, issue_id):
+        """案件一覧に作業管理リンクが表示される（見積は作業管理で入力）"""
         response = client.get("/projects/1/issues/list")
         assert response.status_code == 200
-        assert f"/projects/1/issues/{issue_id}/estimates" in response.text
-        assert ">見積</a>" in response.text
+        assert f"/projects/1/issues/{issue_id}/tasks" in response.text
+        assert ">作業管理</a>" in response.text

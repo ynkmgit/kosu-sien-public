@@ -21,8 +21,10 @@ class TestParseTemplate:
         base, project_fmt, issue_fmt, task_fmt = parse_template(DEFAULT_TEMPLATE)
 
         assert "{__LOGS__}" in base
-        assert "{project_name}" in project_fmt
-        assert "{issue_cd}" in issue_fmt
+        assert project_fmt == ""
+        assert issue_fmt == ""
+        assert "{project_name}" in task_fmt
+        assert "{issue_name}" in task_fmt
         assert "{task_name}" in task_fmt
 
     def test_parse_no_loop_lines(self):
@@ -196,7 +198,7 @@ class TestWorkReportPage:
         """ページ表示が成功する"""
         response = client.get("/work-report")
         assert response.status_code == 200
-        assert "業務終了報告" in response.text
+        assert "報告テンプレート" in response.text
 
     def test_page_with_date_param(self, client):
         """日付指定でページ表示"""
@@ -256,8 +258,8 @@ class TestNavigationLink:
     """ナビゲーションリンクテスト"""
 
     def test_base_has_work_report_link(self, client):
-        """ベーステンプレートに業務終了報告リンクがある"""
+        """ベーステンプレートに報告テンプレートリンクがある"""
         response = client.get("/")
         assert response.status_code == 200
         assert "/work-report" in response.text
-        assert "業務終了報告" in response.text
+        assert "報告テンプレート" in response.text

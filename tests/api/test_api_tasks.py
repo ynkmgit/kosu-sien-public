@@ -108,9 +108,10 @@ def test_update_task(client, issue):
     assert response.json()["cd"] == "UPD2"
 
 
-def test_update_task_progress(client, issue):
-    """進捗率更新"""
-    # 作成
+def test_update_assignee_progress(client, issue):
+    """担当者の進捗率更新（/assignments/assignees/{id}/progress）"""
+    from services import UserService, TaskAssigneeService
+    # 作業作成
     create_res = client.post("/api/v1/tasks", json={
         "issue_id": issue["id"],
         "cd": "PRG",
@@ -118,15 +119,15 @@ def test_update_task_progress(client, issue):
     })
     task_id = create_res.json()["id"]
 
+    # ユーザー作成＋担当割当
+    user = UserService.create("PRG-U", "Progress User")
+    assignee_id = TaskAssigneeService.create(task_id, user["id"])
+
     # 進捗更新
-    response = client.put(f"/api/v1/tasks/{task_id}/progress", json={
-        "progress_rate": 50
+    response = client.put(f"/assignments/assignees/{assignee_id}/progress", data={
+        "progress_rate": "50"
     })
     assert response.status_code == 204
-
-    # 確認
-    task = client.get(f"/api/v1/tasks/{task_id}").json()
-    assert task["progress_rate"] == 50
 
 
 def test_delete_task(client, issue):

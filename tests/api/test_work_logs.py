@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from database import get_db
-from routers.work_logs import calculate_totals
+from services import WorkLogService
 
 
 @pytest.fixture
@@ -235,46 +235,55 @@ class TestWorkLogDelete:
 
 
 class TestProgressRate:
-    """進捗率テスト"""
+    """進捗率テスト（担当者単位）"""
 
-    def test_update_progress(self, client, task_id):
+    @pytest.fixture
+    def assignee_id(self, client, project_id, task_id, user_id):
+        """担当割当を作成してassignee_idを返す"""
+        response = client.post("/assignments/assignees", data={
+            "task_id": str(task_id),
+            "user_id": str(user_id)
+        })
+        return response.json()["assignee_id"]
+
+    def test_update_progress(self, client, assignee_id):
         """進捗率更新が成功する"""
-        response = client.put(f"/tasks/{task_id}/progress", data={
+        response = client.put(f"/assignments/assignees/{assignee_id}/progress", data={
             "progress_rate": "50"
         })
-        assert response.status_code == 200
+        assert response.status_code == 204
 
-    def test_progress_100_percent(self, client, task_id):
+    def test_progress_100_percent(self, client, assignee_id):
         """100%が設定できる"""
-        response = client.put(f"/tasks/{task_id}/progress", data={
+        response = client.put(f"/assignments/assignees/{assignee_id}/progress", data={
             "progress_rate": "100"
         })
-        assert response.status_code == 200
+        assert response.status_code == 204
 
-    def test_progress_0_percent(self, client, task_id):
-        """0%が設定できる"""
-        response = client.put(f"/tasks/{task_id}/progress", data={
+    def test_progress_0_percent(self, client, assignee_id):
+        """0%が設定できる（NULLとして保存）"""
+        response = client.put(f"/assignments/assignees/{assignee_id}/progress", data={
             "progress_rate": "0"
         })
-        assert response.status_code == 200
+        assert response.status_code == 204
 
-    def test_progress_over_100_returns_400(self, client, task_id):
+    def test_progress_over_100_returns_400(self, client, assignee_id):
         """100%超は400"""
-        response = client.put(f"/tasks/{task_id}/progress", data={
+        response = client.put(f"/assignments/assignees/{assignee_id}/progress", data={
             "progress_rate": "101"
         })
         assert response.status_code == 400
 
-    def test_progress_negative_returns_400(self, client, task_id):
+    def test_progress_negative_returns_400(self, client, assignee_id):
         """負の進捗率は400"""
-        response = client.put(f"/tasks/{task_id}/progress", data={
+        response = client.put(f"/assignments/assignees/{assignee_id}/progress", data={
             "progress_rate": "-1"
         })
         assert response.status_code == 400
 
-    def test_progress_nonexistent_task_returns_404(self, client):
-        """存在しない作業は404"""
-        response = client.put("/tasks/99999/progress", data={
+    def test_progress_nonexistent_assignee_returns_404(self, client):
+        """存在しない割当は404"""
+        response = client.put("/assignments/assignees/99999/progress", data={
             "progress_rate": "50"
         })
         assert response.status_code == 404
@@ -297,7 +306,7 @@ class TestCalculateTotals:
     def test_empty_rows_returns_empty_dicts(self):
         """空のrowsは空の辞書を返す"""
         dates = [date(2026, 1, 20), date(2026, 1, 21)]
-        project_totals, issue_totals = calculate_totals([], dates, {})
+        project_totals, issue_totals = WorkLogService.calculate_grid_totals([], dates, {})
         assert project_totals == {}
         assert issue_totals == {}
 
@@ -312,7 +321,7 @@ class TestCalculateTotals:
             (100, 1000, '2026-01-21'): {'id': 2, 'hours': 3.0},
         }
 
-        project_totals, issue_totals = calculate_totals(rows, dates, work_logs)
+        project_totals, issue_totals = WorkLogService.calculate_grid_totals(rows, dates, work_logs)
 
         # プロジェクト集計
         assert project_totals[1]['2026-01-20'] == 2.0
@@ -338,7 +347,7 @@ class TestCalculateTotals:
             (102, 1000, '2026-01-20'): {'id': 3, 'hours': 3.0},
         }
 
-        project_totals, issue_totals = calculate_totals(rows, dates, work_logs)
+        project_totals, issue_totals = WorkLogService.calculate_grid_totals(rows, dates, work_logs)
 
         # プロジェクト集計（全作業の合計）
         assert project_totals[1]['2026-01-20'] == 6.5
@@ -360,7 +369,7 @@ class TestCalculateTotals:
         ]
         work_logs = {}
 
-        project_totals, issue_totals = calculate_totals(rows, dates, work_logs)
+        project_totals, issue_totals = WorkLogService.calculate_grid_totals(rows, dates, work_logs)
 
         assert project_totals[1]['2026-01-20'] == 0.0
         assert project_totals[1]['total'] == 0.0

@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import UserService
-from .common import templates, render_edit_actions, render_sortable_th, get_user_or_404
+from .common import templates, render_edit_actions, render_sortable_th, get_user_or_404, FilterParams, get_filter_params
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -24,7 +24,6 @@ def render_thead(sort: str, order: str, attr_types: list):
     return f"""<tr>
         {col("cd", "CD", "col-cd")}
         {col("name", "名前", "col-name")}
-        {col("email", "メール")}
         {attr_headers}
         <th class="col-actions">操作</th>
     </tr>"""
@@ -34,7 +33,6 @@ def render_row(u, editing=False, attr_types=None, user_attrs=None):
     """ユーザー行HTML生成"""
     cd = escape(u['cd'] or '')
     name = escape(u['name'])
-    email = escape(u['email'])
 
     if attr_types is None:
         attr_types = []
@@ -63,10 +61,9 @@ def render_row(u, editing=False, attr_types=None, user_attrs=None):
 
     if editing:
         return f"""
-        <tr id="user-{u['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="user-{u['id']}" class="editing-row">
             <td><input type="text" name="cd" value="{cd}" class="edit-input"></td>
             <td><input type="text" name="name" value="{name}" class="edit-input"></td>
-            <td><input type="email" name="email" value="{email}" class="edit-input"></td>
             {attr_cells_html}
             <td>{render_edit_actions("user", u['id'], "/users")}</td>
         </tr>"""
@@ -74,7 +71,6 @@ def render_row(u, editing=False, attr_types=None, user_attrs=None):
     <tr id="user-{u['id']}">
         <td class="cd-cell">{cd}</td>
         <td class="name-cell">{name}</td>
-        <td class="email-cell">{email}</td>
         {attr_cells_html}
         <td><div class="actions-cell">
             <button hx-get="/users/{u['id']}/edit" hx-target="#user-{u['id']}" hx-swap="outerHTML" class="btn btn-sm btn-ghost">編集</button>
@@ -83,15 +79,9 @@ def render_row(u, editing=False, attr_types=None, user_attrs=None):
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
-    filter_params = {"user": user, "project": project, "issue": issue}
+def page(request: Request, filters: FilterParams = Depends(get_filter_params)):
     return templates.TemplateResponse(request, "users.html", {
-        "active": "users", "filter_params": filter_params
+        "active": "users", "filter_params": filters.to_dict()
     })
 
 
@@ -101,10 +91,11 @@ def list_all(sort: str = "cd", order: str = "asc", q: str = ""):
     attr_types = UserService.get_attribute_types()
     rows = UserService.get_all(sort=sort, order=order, q=q)
 
+    # N+1回避: 全ユーザーの属性を一括取得
+    all_attrs = UserService.get_all_attributes([r['id'] for r in rows])
     tbody = ""
     for r in rows:
-        user_attrs = UserService.get_attributes(r['id'])
-        tbody += render_row(r, attr_types=attr_types, user_attrs=user_attrs)
+        tbody += render_row(r, attr_types=attr_types, user_attrs=all_attrs.get(r['id'], {}))
 
     thead = render_thead(sort, order, attr_types)
     return HTMLResponse(f"<thead>{thead}</thead><tbody>{tbody}</tbody>")
@@ -131,18 +122,18 @@ def edit_row(id: int):
 
 
 @router.post("", response_class=HTMLResponse)
-def create(cd: str = Form(...), name: str = Form(...), email: str = Form(...)):
+def create(cd: str = Form(...), name: str = Form(...)):
     attr_types = UserService.get_attribute_types()
-    u = UserService.create(cd=cd, name=name, email=email)
+    u = UserService.create(cd=cd, name=name)
     return HTMLResponse(render_row(u, attr_types=attr_types, user_attrs={}))
 
 
 @router.put("/{id}", response_class=HTMLResponse)
-async def update(id: int, request: Request, cd: str = Form(...), name: str = Form(...), email: str = Form(...)):
+async def update(id: int, request: Request, cd: str = Form(...), name: str = Form(...)):
     attr_types = UserService.get_attribute_types()
 
     # ユーザー更新
-    u = UserService.update(user_id=id, cd=cd, name=name, email=email)
+    u = UserService.update(user_id=id, cd=cd, name=name)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
 

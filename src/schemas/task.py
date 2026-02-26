@@ -7,19 +7,17 @@ class TaskCreate(BaseModel):
     issue_id: int
     cd: str
     name: str
-    description: str = ""
 
 
 class TaskUpdate(BaseModel):
     """作業更新"""
     cd: str
     name: str
-    description: str = ""
 
 
 class TaskProgressUpdate(BaseModel):
-    """進捗率更新"""
-    progress_rate: int = Field(ge=0, le=100)
+    """進捗率更新（None or 0はNULLとして扱う）"""
+    progress_rate: int | None = Field(default=None, ge=0, le=100)
 
 
 class TaskOut(BaseModel):
@@ -27,8 +25,8 @@ class TaskOut(BaseModel):
     id: int
     cd: str
     name: str
-    description: str | None
     issue_id: int
+    estimate_hours: float | None = None
     progress_rate: int | None = 0
     sort_order: int | None = 0
     issue_cd: str | None = None

@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import IssueEstimateService
-from .common import templates, get_project_or_404, get_issue_or_404, render_edit_actions
+from .common import templates, get_project_or_404, get_issue_or_404, render_edit_actions, FilterParams, get_filter_params
 
 router = APIRouter(prefix="/projects/{project_id}/issues/{issue_id}/estimates", tags=["issue_estimates"])
 
@@ -21,7 +21,7 @@ def render_row(item, project_id: int, issue_id: int, editing=False):
     if editing:
         base_path = f"/projects/{project_id}/issues/{issue_id}/estimates"
         return f"""
-        <tr id="estimate-{item['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="estimate-{item['id']}" class="editing-row">
             <td><input type="text" name="name" value="{name}" class="edit-input" required></td>
             <td><input type="number" name="hours" value="{hours}" class="edit-input" step="0.25" min="0.25" required></td>
             <td>{render_edit_actions("estimate", item['id'], base_path)}</td>
@@ -48,22 +48,14 @@ def render_total_row(total: float):
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    project_id: int,
-    issue_id: int,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
+def page(request: Request, project_id: int, issue_id: int, filters: FilterParams = Depends(get_filter_params)):
     proj = get_project_or_404(project_id)
     iss = get_issue_or_404(project_id, issue_id)
-    filter_params = {"user": user, "project": project, "issue": issue}
     return templates.TemplateResponse(request, "issue_estimates.html", {
         "active": "projects",
         "project": proj,
         "issue": iss,
-        "filter_params": filter_params,
+        "filter_params": filters.to_dict(),
     })
 
 

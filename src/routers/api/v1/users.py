@@ -30,7 +30,7 @@ def get_user(user_id: int):
 @router.post("", response_model=UserOut, status_code=201)
 def create_user(body: UserCreate):
     """ユーザー作成"""
-    return UserService.create(cd=body.cd, name=body.name, email=body.email)
+    return UserService.create(cd=body.cd, name=body.name)
 
 
 @router.put("/{user_id}", response_model=UserOut)
@@ -39,8 +39,7 @@ def update_user(user_id: int, body: UserUpdate):
     user = UserService.update(
         user_id=user_id,
         cd=body.cd,
-        name=body.name,
-        email=body.email
+        name=body.name
     )
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

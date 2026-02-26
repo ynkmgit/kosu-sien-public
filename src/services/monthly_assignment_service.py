@@ -1,6 +1,6 @@
 """月次アサインサービス
 
-責務: 月次アサインのデータ操作のみ
+責務: 月次アサインのデータ操作 + 集計計算
 """
 from datetime import datetime
 from database import get_db
@@ -134,3 +134,52 @@ class MonthlyAssignmentService:
         with get_db() as conn:
             cur = conn.execute("DELETE FROM monthly_assignment WHERE id = ?", (assignment_id,))
         return cur.rowcount > 0
+
+    @staticmethod
+    def calculate_grid_totals(
+        users: list[dict],
+        projects: list[dict],
+        assignments: dict,
+        actuals: dict = None
+    ) -> tuple[dict, dict, dict]:
+        """月次アサイングリッドの集計を計算
+
+        責務: 集計計算のみ（単一目的）
+
+        Args:
+            users: ユーザーリスト
+            projects: プロジェクトリスト
+            assignments: {(user_id, project_id): {'id': id, 'hours': planned_hours}}
+            actuals: {(user_id, project_id): actual_hours} or None
+
+        Returns:
+            user_totals: {user_id: {'planned': hours, 'actual': hours}}
+            project_totals: {project_id: {'planned': hours, 'actual': hours}}
+            grand_totals: {'planned': hours, 'actual': hours}
+        """
+        if actuals is None:
+            actuals = {}
+
+        user_totals = {}
+        project_totals = {p['id']: {'planned': 0.0, 'actual': 0.0} for p in projects}
+        grand_totals = {'planned': 0.0, 'actual': 0.0}
+
+        for user in users:
+            uid = user['id']
+            user_totals[uid] = {'planned': 0.0, 'actual': 0.0}
+
+            for project in projects:
+                pid = project['id']
+                assignment = assignments.get((uid, pid))
+                planned = assignment['hours'] if assignment else 0
+                actual = actuals.get((uid, pid), 0)
+
+                user_totals[uid]['planned'] += planned
+                user_totals[uid]['actual'] += actual
+                project_totals[pid]['planned'] += planned
+                project_totals[pid]['actual'] += actual
+
+            grand_totals['planned'] += user_totals[uid]['planned']
+            grand_totals['actual'] += user_totals[uid]['actual']
+
+        return user_totals, project_totals, grand_totals

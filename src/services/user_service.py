@@ -2,7 +2,10 @@
 
 責務: ユーザーのデータ操作のみ
 """
+import sqlite3
+
 from database import get_db
+from exceptions import DuplicateCodeError
 
 
 class UserService:
@@ -11,7 +14,7 @@ class UserService:
     @staticmethod
     def get_all(sort: str = "cd", order: str = "asc", q: str = "", active_only: bool = False) -> list[dict]:
         """ユーザー一覧を取得"""
-        allowed_sorts = {"cd", "name", "email"}
+        allowed_sorts = {"cd", "name"}
         if sort not in allowed_sorts:
             sort = "cd"
         order_dir = "DESC" if order.lower() == "desc" else "ASC"
@@ -25,8 +28,8 @@ class UserService:
 
             if q:
                 like = f"%{q}%"
-                conditions.append("(cd LIKE ? OR name LIKE ? OR email LIKE ?)")
-                params.extend([like, like, like])
+                conditions.append("(cd LIKE ? OR name LIKE ?)")
+                params.extend([like, like])
 
             where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
             rows = conn.execute(
@@ -57,24 +60,30 @@ class UserService:
         return dict(row) if row else None
 
     @staticmethod
-    def create(cd: str, name: str, email: str) -> dict:
+    def create(cd: str, name: str) -> dict:
         """ユーザー作成"""
         with get_db() as conn:
-            cur = conn.execute(
-                "INSERT INTO user (cd, name, email) VALUES (?, ?, ?)",
-                (cd, name, email)
-            )
+            try:
+                cur = conn.execute(
+                    "INSERT INTO user (cd, name) VALUES (?, ?)",
+                    (cd, name)
+                )
+            except sqlite3.IntegrityError:
+                raise DuplicateCodeError(f"ユーザーCD '{cd}' は既に使用されています")
             row = conn.execute("SELECT * FROM user WHERE id = ?", (cur.lastrowid,)).fetchone()
         return dict(row)
 
     @staticmethod
-    def update(user_id: int, cd: str, name: str, email: str) -> dict | None:
+    def update(user_id: int, cd: str, name: str) -> dict | None:
         """ユーザー更新"""
         with get_db() as conn:
-            cur = conn.execute(
-                "UPDATE user SET cd = ?, name = ?, email = ? WHERE id = ?",
-                (cd, name, email, user_id)
-            )
+            try:
+                cur = conn.execute(
+                    "UPDATE user SET cd = ?, name = ? WHERE id = ?",
+                    (cd, name, user_id)
+                )
+            except sqlite3.IntegrityError:
+                raise DuplicateCodeError(f"ユーザーCD '{cd}' は既に使用されています")
             if cur.rowcount == 0:
                 return None
             row = conn.execute("SELECT * FROM user WHERE id = ?", (user_id,)).fetchone()
@@ -99,6 +108,32 @@ class UserService:
                 (user_id,)
             ).fetchall()
         return {a['type_id']: {'option_id': a['option_id'], 'option_name': a['option_name']} for a in attrs}
+
+    @staticmethod
+    def get_all_attributes(user_ids: list[int]) -> dict[int, dict]:
+        """複数ユーザーの属性値を一括取得
+
+        Returns:
+            {user_id: {type_id: {option_id, option_name}}}
+        """
+        if not user_ids:
+            return {}
+        with get_db() as conn:
+            placeholders = ",".join("?" * len(user_ids))
+            attrs = conn.execute(
+                f"""SELECT ua.user_id, ua.type_id, ua.option_id, uao.name as option_name
+                   FROM user_attribute ua
+                   JOIN user_attribute_option uao ON ua.option_id = uao.id
+                   WHERE ua.user_id IN ({placeholders})""",
+                user_ids
+            ).fetchall()
+        result: dict[int, dict] = {}
+        for a in attrs:
+            uid = a['user_id']
+            if uid not in result:
+                result[uid] = {}
+            result[uid][a['type_id']] = {'option_id': a['option_id'], 'option_name': a['option_name']}
+        return result
 
     @staticmethod
     def set_attribute(user_id: int, type_id: int, option_id: int | None) -> bool:

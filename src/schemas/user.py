@@ -1,19 +1,17 @@
 """ユーザースキーマ"""
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 
 
 class UserCreate(BaseModel):
     """ユーザー作成"""
     cd: str
     name: str
-    email: EmailStr
 
 
 class UserUpdate(BaseModel):
     """ユーザー更新"""
     cd: str
     name: str
-    email: EmailStr
 
 
 class UserOut(BaseModel):
@@ -21,7 +19,6 @@ class UserOut(BaseModel):
     id: int
     cd: str
     name: str
-    email: str
     is_active: int | None = 1
 
     model_config = ConfigDict(from_attributes=True)

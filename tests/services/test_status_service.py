@@ -26,6 +26,16 @@ def test_create_status(clean_db):
     assert status["name"] == "TODO"
     assert status["sort_order"] == 1
     assert status["project_id"] == project_id
+    assert status["is_done"] == 0
+
+
+def test_create_status_with_is_done(clean_db):
+    """完了扱いステータス作成"""
+    project_id = _create_project()
+    status = StatusService.create(project_id, "closed", "完了", 2, is_done=1)
+
+    assert status["code"] == "closed"
+    assert status["is_done"] == 1
 
 
 def test_get_all_sorted(clean_db):
@@ -66,11 +76,12 @@ def test_update_status(clean_db):
     project_id = _create_project()
     created = StatusService.create(project_id, "old", "Old Name", 0)
 
-    updated = StatusService.update(created["id"], project_id, "new", "New Name", 5)
+    updated = StatusService.update(created["id"], project_id, "new", "New Name", 5, is_done=1)
     assert updated is not None
     assert updated["code"] == "new"
     assert updated["name"] == "New Name"
     assert updated["sort_order"] == 5
+    assert updated["is_done"] == 1
 
 
 def test_update_not_found(clean_db):

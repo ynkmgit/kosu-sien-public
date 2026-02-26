@@ -112,7 +112,7 @@ def test_user_cascade_delete(client, clean_db):
     """ユーザー削除時に設定も削除される"""
     with get_db() as conn:
         # テスト用ユーザー作成
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('DEL_TEST', 'Delete Test', 'del@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('DEL_TEST', 'Delete Test')")
         user_id = conn.execute("SELECT id FROM user WHERE cd = 'DEL_TEST'").fetchone()['id']
 
     # 設定保存

@@ -114,7 +114,7 @@ def test_is_in_use_true(clean_db):
     created = UserAttributeOptionService.create(type_id, "used", "Used", 0)
 
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U1', 'User1', 'u1@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U1', 'User1')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
         conn.execute(

@@ -2,26 +2,19 @@
 
 責務: 日次工数実績をテンプレートで整形し報告書を生成
 """
+import json
 from datetime import date
 from html import escape
 
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse
-from services import UserService, WorkLogService
-from .common import templates
+from database import DEFAULT_REPORT_TEMPLATE
+from services import UserService, WorkLogService, ReportTemplateService
+from .common import templates, WEEKDAY_NAMES
 
 router = APIRouter(prefix="/work-report", tags=["work_report"])
 
-# デフォルトテンプレート
-DEFAULT_TEMPLATE = """業務終了します。
-【工数実績】
- {total_hours}H
-【作業実績、進捗率】
-@project {project_name}
-@issue {issue_cd} {issue_name}
-@task   {task_name} ({progress}%)"""
-
-WEEKDAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"]
+DEFAULT_TEMPLATE = DEFAULT_REPORT_TEMPLATE
 
 
 def parse_template(template: str) -> tuple[str, str, str, str]:
@@ -179,8 +172,10 @@ def page(
     request: Request,
     user: int = Query(default=None),
     target_date: str = Query(default=None),
+    template_id: int = Query(default=None),
     project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
+    issue: list[int] = Query(default=[]),
+    fold: str = Query(default=""),
 ):
     """業務終了報告ページ"""
     # デフォルトは今日
@@ -200,6 +195,25 @@ def page(
     user_cd = ""
     user_name = ""
 
+    # テンプレート選択（全ユーザー共通）
+    all_templates = ReportTemplateService.get_all()
+    selected_tmpl = None
+    if template_id:
+        selected_tmpl = next((t for t in all_templates if t['id'] == template_id), None)
+    if not selected_tmpl and all_templates:
+        selected_tmpl = all_templates[0]
+
+    if selected_tmpl:
+        active_template = selected_tmpl['body']
+        try:
+            opts = json.loads(selected_tmpl.get('options', '{}'))
+        except (json.JSONDecodeError, AttributeError):
+            opts = {}
+        hide_zero = opts.get('hideZeroProgress', False)
+    else:
+        active_template = DEFAULT_TEMPLATE
+        hide_zero = False
+
     if user:
         # 選択中ユーザーの情報取得
         for u in users:
@@ -212,12 +226,12 @@ def page(
         logs = WorkLogService.get_user_daily_logs(user, selected_date)
         total_hours = sum(log['hours'] for log in logs)
         preview = generate_report(
-            DEFAULT_TEMPLATE, total_hours, logs,
-            selected_date, user_cd, user_name
+            active_template, total_hours, logs,
+            selected_date, user_cd, user_name, hide_zero
         )
 
     # グローバルフィルター用（userは単一選択なのでリストに変換）
-    filter_params = {"user": [user] if user else [], "project": project, "issue": issue}
+    filter_params = {"user": [user] if user else [], "project": project, "issue": issue, "fold": fold}
     return templates.TemplateResponse(request, "work_report.html", {
         "active": "work_report",
         "users": users,
@@ -225,6 +239,10 @@ def page(
         "selected_user_info": selected_user_info,
         "selected_date": selected_date.isoformat(),
         "default_template": DEFAULT_TEMPLATE,
+        "active_template": active_template,
+        "all_templates": all_templates,
+        "selected_template_id": selected_tmpl['id'] if selected_tmpl else None,
+        "hide_zero": hide_zero,
         "total_hours": total_hours,
         "preview": preview,
         "user_cd": user_cd,

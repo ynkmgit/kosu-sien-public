@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from 'macros/page_header.html' import page_header %}
-{% from 'macros/forms.html' import loading_row, form_card_header, add_button %}
+{% from 'macros/forms.html' import loading_row, add_button %}
 {% block title %}見積内訳 - {{ issue.name }}{% endblock %}
 {% block content %}
 {{ page_header(
@@ -9,29 +9,45 @@
     breadcrumbs=[
         {'label': 'プロジェクト一覧', 'href': '/projects'},
         {'label': project.name, 'href': '/projects/' ~ project.id},
-        {'label': '案件', 'href': '/projects/' ~ project.id ~ '/issues'},
-        {'label': issue.name ~ ' - 見積内訳'}
+        {'label': issue.name ~ ' - 作業', 'href': '/projects/' ~ project.id ~ '/issues/' ~ issue.id ~ '/tasks'},
+        {'label': '見積内訳'}
     ]
 ) }}
 
-<div class="form-card">
-    {{ form_card_header('見積項目追加') }}
-    <form class="add-form" hx-post="/projects/{{ project.id }}/issues/{{ issue.id }}/estimates" hx-target="#estimate-table tbody tr.total-row" hx-swap="beforebegin" hx-on::after-request="if(event.detail.successful) { this.reset(); htmx.trigger('#estimate-table', 'refreshTotal'); }">
-        <div class="form-group">
-            <label class="form-label">項目名</label>
-            <input type="text" name="name" placeholder="設計、実装、テスト等" required class="form-input">
-        </div>
-        <div class="form-group">
-            <label class="form-label">工数(h)</label>
-            <input type="number" name="hours" placeholder="8.0" required class="form-input input-hours" step="0.25" min="0.25">
-        </div>
-        {{ add_button() }}
-    </form>
+<div class="project-subnav">
+    <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/tasks" class="subnav-link">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        作業管理
+    </a>
+    <a href="/projects/{{ project.id }}/issues/{{ issue.id }}/estimates" class="subnav-link active">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        見積内訳
+    </a>
 </div>
 
 <div class="table-card">
     <div class="table-header">
         <span class="table-title">見積内訳一覧</span>
+        <div class="header-actions">
+            <button type="button" class="btn btn-primary btn-sm add-toggle" onclick="toggleAddForm(this)">+ 追加</button>
+        </div>
+    </div>
+    <div class="inline-add-row hidden">
+        <form class="add-form" hx-post="/projects/{{ project.id }}/issues/{{ issue.id }}/estimates" hx-target="#estimate-table tbody tr.total-row" hx-swap="beforebegin" hx-on::after-request="if(event.detail.successful) { this.reset(); hideAddForm(this); htmx.trigger('#estimate-table', 'refreshTotal'); }">
+            <div class="form-group">
+                <label class="form-label">項目名</label>
+                <input type="text" name="name" placeholder="設計、実装、テスト等" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">工数(h)</label>
+                <input type="number" name="hours" placeholder="8.0" required class="form-input input-hours" step="0.25" min="0.25">
+            </div>
+            {{ add_button() }}
+        </form>
     </div>
     <table id="estimate-table" hx-get="/projects/{{ project.id }}/issues/{{ issue.id }}/estimates/list" hx-trigger="load, refreshTotal from:body" hx-target="#estimate-table" hx-swap="innerHTML">
         <thead>

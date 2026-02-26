@@ -12,7 +12,7 @@ def _setup_project_with_task():
         issue_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute("INSERT INTO task (issue_id, cd, name) VALUES (?, 'T1', 'Task1')", (issue_id,))
         task_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('ASSIGNEE', 'Assignee', 'assignee@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('ASSIGNEE', 'Assignee')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     return project_id, task_id, user_id
 

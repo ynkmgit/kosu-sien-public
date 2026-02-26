@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import UserAttributeTypeService
-from .common import templates, render_edit_actions
+from .common import templates, render_edit_actions, FilterParams, get_filter_params
 
 router = APIRouter(prefix="/user-attribute-types", tags=["user-attribute-types"])
 
@@ -21,7 +21,7 @@ def render_row(t, option_count: int = 0, editing=False):
 
     if editing:
         return f"""
-        <tr id="attr-type-{t['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="attr-type-{t['id']}" class="editing-row">
             <td><input type="text" name="code" value="{code}" class="edit-input"></td>
             <td><input type="text" name="name" value="{name}" class="edit-input"></td>
             <td><input type="number" name="sort_order" value="{sort_order}" class="edit-input" step="1" min="0"></td>
@@ -43,16 +43,10 @@ def render_row(t, option_count: int = 0, editing=False):
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
-    filter_params = {"user": user, "project": project, "issue": issue}
+def page(request: Request, filters: FilterParams = Depends(get_filter_params)):
     return templates.TemplateResponse(request, "user_attribute_types.html", {
         "active": "user-attributes",
-        "filter_params": filter_params,
+        "filter_params": filters.to_dict(),
     })
 
 

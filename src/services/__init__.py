@@ -16,6 +16,11 @@ from .user_setting_service import UserSettingService
 from .task_assignee_service import TaskAssigneeService
 from .monthly_assignment_service import MonthlyAssignmentService
 from .dashboard_service import DashboardService
+from .report_template_service import ReportTemplateService
+from .task_status_service import TaskStatusService
+from .issue_tag_service import IssueTagService
+from .task_tag_service import TaskTagService
+from .task_monthly_plan_service import TaskMonthlyPlanService
 
 __all__ = [
     "ProjectService",
@@ -31,4 +36,9 @@ __all__ = [
     "TaskAssigneeService",
     "MonthlyAssignmentService",
     "DashboardService",
+    "ReportTemplateService",
+    "TaskStatusService",
+    "IssueTagService",
+    "TaskTagService",
+    "TaskMonthlyPlanService",
 ]

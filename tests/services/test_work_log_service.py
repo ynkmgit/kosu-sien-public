@@ -12,10 +12,10 @@ from services.work_log_service import WorkLogService
 @pytest.fixture
 def assigned_task(clean_db):
     """担当割当済みの作業とユーザー"""
-    project = ProjectService.create("PROJ", "Test Project", "")
+    project = ProjectService.create("PROJ", "Test Project")
     issue = IssueService.create(project["id"], "ISS", "Test Issue")
     task = TaskService.create(issue["id"], "TSK", "Test Task")
-    user = UserService.create("WRK", "Worker", "work@test.com")
+    user = UserService.create("WRK", "Worker")
 
     # 担当割当
     with get_db() as conn:
@@ -85,10 +85,10 @@ def test_upsert_delete_on_zero(clean_db, assigned_task):
 
 def test_upsert_not_assigned(clean_db):
     """担当でない場合エラー"""
-    project = ProjectService.create("P", "Project", "")
+    project = ProjectService.create("P", "Project")
     issue = IssueService.create(project["id"], "I", "Issue")
     task = TaskService.create(issue["id"], "T", "Task")
-    user = UserService.create("U", "User", "u@test.com")
+    user = UserService.create("U", "User")
 
     with pytest.raises(ValueError, match="担当"):
         WorkLogService.upsert(task["id"], user["id"], date.today(), 1.0)

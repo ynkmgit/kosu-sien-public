@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from services import TaskService, IssueService
-from schemas import TaskCreate, TaskUpdate, TaskOut, TaskProgressUpdate
+from schemas import TaskCreate, TaskUpdate, TaskOut
 
 router = APIRouter(prefix="/tasks", tags=["api-tasks"])
 
@@ -44,8 +44,7 @@ def create_task(body: TaskCreate):
     return TaskService.create(
         issue_id=body.issue_id,
         cd=body.cd,
-        name=body.name,
-        description=body.description
+        name=body.name
     )
 
 
@@ -55,22 +54,11 @@ def update_task(task_id: int, body: TaskUpdate):
     task = TaskService.update(
         task_id=task_id,
         cd=body.cd,
-        name=body.name,
-        description=body.description
+        name=body.name
     )
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
-
-
-@router.put("/{task_id}/progress", status_code=204)
-def update_task_progress(task_id: int, body: TaskProgressUpdate):
-    """進捗率更新"""
-    try:
-        if not TaskService.update_progress(task_id, body.progress_rate):
-            raise HTTPException(status_code=404, detail="Task not found")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{task_id}", status_code=204)

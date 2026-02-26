@@ -1,6 +1,6 @@
 """実績サービス
 
-責務: 工数実績のデータ操作のみ
+責務: 工数実績のデータ操作 + 集計計算
 """
 from datetime import date
 from database import get_db
@@ -169,32 +169,72 @@ class WorkLogService:
         return result[0] if result else 0
 
     @staticmethod
-    def get_assignee_rows(user_ids: list[int] = None, project_ids: list[int] = None, issue_ids: list[int] = None) -> list[dict]:
-        """担当割当から行データを取得"""
+    def get_assignee_rows(user_ids: list[int] = None, project_ids: list[int] = None, issue_ids: list[int] = None, tag_ids: list[int] = None,
+                          issue_statuses: list[str] = None, task_statuses: list[str] = None,
+                          exclude_done_issue: bool = False, exclude_done_task: bool = False,
+                          include_unassigned: bool = False) -> list[dict]:
+        """担当割当から行データを取得
+
+        Args:
+            include_unassigned: Trueなら担当未割当の作業も含める
+        """
         with get_db() as conn:
-            query = """
-                SELECT
-                    ta.id as assignee_id,
-                    ta.task_id,
-                    ta.user_id,
-                    t.cd as task_cd,
-                    t.name as task_name,
-                    t.progress_rate,
-                    i.id as issue_id,
-                    i.cd as issue_cd,
-                    i.name as issue_name,
-                    p.id as project_id,
-                    p.cd as project_cd,
-                    p.name as project_name,
-                    u.cd as user_cd,
-                    u.name as user_name
-                FROM task_assignee ta
-                JOIN task t ON ta.task_id = t.id
-                JOIN issue i ON t.issue_id = i.id
-                JOIN project p ON i.project_id = p.id
-                JOIN user u ON ta.user_id = u.id
-                WHERE (u.is_active = 1 OR u.is_active IS NULL)
-            """
+            if include_unassigned:
+                query = """
+                    SELECT
+                        ta.id as assignee_id,
+                        t.id as task_id,
+                        ta.user_id,
+                        t.cd as task_cd,
+                        t.name as task_name,
+                        ta.progress_rate,
+                        t.status as task_status,
+                        t.estimate_hours,
+                        (SELECT COALESCE(SUM(w.hours), 0) FROM work_log w WHERE w.task_id = t.id) as actual_hours,
+                        i.id as issue_id,
+                        i.status as issue_status,
+                        i.cd as issue_cd,
+                        i.name as issue_name,
+                        p.id as project_id,
+                        p.cd as project_cd,
+                        p.name as project_name,
+                        u.cd as user_cd,
+                        u.name as user_name
+                    FROM task t
+                    JOIN issue i ON t.issue_id = i.id
+                    JOIN project p ON i.project_id = p.id
+                    LEFT JOIN task_assignee ta ON ta.task_id = t.id
+                    LEFT JOIN user u ON ta.user_id = u.id
+                    WHERE (u.is_active = 1 OR u.is_active IS NULL OR ta.id IS NULL)
+                """
+            else:
+                query = """
+                    SELECT
+                        ta.id as assignee_id,
+                        ta.task_id,
+                        ta.user_id,
+                        t.cd as task_cd,
+                        t.name as task_name,
+                        ta.progress_rate,
+                        t.status as task_status,
+                        t.estimate_hours,
+                        (SELECT COALESCE(SUM(w.hours), 0) FROM work_log w WHERE w.task_id = t.id) as actual_hours,
+                        i.id as issue_id,
+                        i.status as issue_status,
+                        i.cd as issue_cd,
+                        i.name as issue_name,
+                        p.id as project_id,
+                        p.cd as project_cd,
+                        p.name as project_name,
+                        u.cd as user_cd,
+                        u.name as user_name
+                    FROM task_assignee ta
+                    JOIN task t ON ta.task_id = t.id
+                    JOIN issue i ON t.issue_id = i.id
+                    JOIN project p ON i.project_id = p.id
+                    JOIN user u ON ta.user_id = u.id
+                    WHERE (u.is_active = 1 OR u.is_active IS NULL)
+                """
             params = []
 
             if user_ids:
@@ -211,6 +251,26 @@ class WorkLogService:
                 placeholders = ",".join("?" * len(issue_ids))
                 query += f" AND i.id IN ({placeholders})"
                 params.extend(issue_ids)
+
+            if tag_ids:
+                placeholders = ",".join("?" * len(tag_ids))
+                query += f" AND t.id IN (SELECT task_id FROM task_tag WHERE tag_id IN ({placeholders}))"
+                params.extend(tag_ids)
+
+            if issue_statuses:
+                placeholders = ",".join("?" * len(issue_statuses))
+                query += f" AND i.status IN ({placeholders})"
+                params.extend(issue_statuses)
+
+            if task_statuses:
+                placeholders = ",".join("?" * len(task_statuses))
+                query += f" AND t.status IN ({placeholders})"
+                params.extend(task_statuses)
+
+            if exclude_done_issue:
+                query += " AND NOT EXISTS (SELECT 1 FROM project_status ps WHERE ps.project_id = p.id AND ps.code = i.status AND ps.is_done = 1)"
+            if exclude_done_task:
+                query += " AND NOT EXISTS (SELECT 1 FROM task_status ts WHERE ts.issue_id = i.id AND ts.code = t.status AND ts.is_done = 1)"
 
             query += " ORDER BY p.cd, i.cd, t.cd, u.cd"
 
@@ -271,7 +331,7 @@ class WorkLogService:
                 """SELECT
                     wl.hours,
                     t.name as task_name,
-                    t.progress_rate,
+                    ta.progress_rate,
                     i.cd as issue_cd,
                     i.name as issue_name,
                     p.cd as project_cd,
@@ -280,8 +340,58 @@ class WorkLogService:
                 JOIN task t ON wl.task_id = t.id
                 JOIN issue i ON t.issue_id = i.id
                 JOIN project p ON i.project_id = p.id
+                LEFT JOIN task_assignee ta ON ta.task_id = t.id AND ta.user_id = wl.user_id
                 WHERE wl.user_id = ? AND wl.work_date = ?
                 ORDER BY p.cd, i.cd, t.name""",
                 (user_id, target_date.isoformat())
             ).fetchall()
         return [dict(r) for r in rows]
+
+    @staticmethod
+    def calculate_grid_totals(
+        rows: list[dict],
+        dates: list[date],
+        work_logs: dict
+    ) -> tuple[dict, dict]:
+        """プロジェクト・案件別の集計を計算
+
+        責務: 集計計算のみ（単一目的）
+
+        Args:
+            rows: 担当割当の行データ
+            dates: 日付リスト
+            work_logs: {(task_id, user_id, date_str): {id, hours}}
+
+        Returns:
+            project_totals: {project_id: {date_str: hours, "total": hours}}
+            issue_totals: {(project_id, issue_id): {date_str: hours, "total": hours}}
+        """
+        project_totals = {}
+        issue_totals = {}
+
+        for row in rows:
+            pid = row['project_id']
+            iid = row['issue_id']
+
+            # プロジェクト集計の初期化
+            if pid not in project_totals:
+                project_totals[pid] = {d.isoformat(): 0.0 for d in dates}
+                project_totals[pid]["total"] = 0.0
+
+            # 案件集計の初期化
+            key = (pid, iid)
+            if key not in issue_totals:
+                issue_totals[key] = {d.isoformat(): 0.0 for d in dates}
+                issue_totals[key]["total"] = 0.0
+
+            # 各日付の実績を集計
+            for d in dates:
+                date_str = d.isoformat()
+                log = work_logs.get((row['task_id'], row['user_id'], date_str))
+                hours = log['hours'] if log else 0
+                project_totals[pid][date_str] += hours
+                project_totals[pid]["total"] += hours
+                issue_totals[key][date_str] += hours
+                issue_totals[key]["total"] += hours
+
+        return project_totals, issue_totals

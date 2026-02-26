@@ -6,7 +6,7 @@ from database import get_db
 def test_get_not_exists(clean_db):
     """設定なしでNone"""
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U1', 'User1', 'u1@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U1', 'User1')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     result = UserSettingService.get(user_id, "nonexistent_key")
@@ -16,7 +16,7 @@ def test_get_not_exists(clean_db):
 def test_save_and_get(clean_db):
     """設定保存と取得"""
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U2', 'User2', 'u2@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U2', 'User2')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     result = UserSettingService.save(user_id, "theme", "dark")
@@ -29,7 +29,7 @@ def test_save_and_get(clean_db):
 def test_save_upsert(clean_db):
     """設定更新（upsert）"""
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U3', 'User3', 'u3@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U3', 'User3')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     UserSettingService.save(user_id, "lang", "ja")
@@ -48,7 +48,7 @@ def test_save_nonexistent_user(clean_db):
 def test_delete(clean_db):
     """設定削除"""
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U4', 'User4', 'u4@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U4', 'User4')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     UserSettingService.save(user_id, "delete_me", "value")

@@ -12,8 +12,7 @@ def issue_id(client):
         "cd": unique_cd,
         "name": "作業テスト用案件",
         "status": "open",
-        "description": ""
-    })
+            })
     match = re.search(r'id="issue-(\d+)"', response.text)
     return int(match.group(1))
 
@@ -44,8 +43,7 @@ class TestTaskCreate:
         """作成が成功する"""
         response = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
             "cd": "T001",
-            "name": "テスト作業",
-            "description": "テスト説明"
+            "name": "テスト作業"
         })
         assert response.status_code == 200
         assert "T001" in response.text
@@ -55,10 +53,18 @@ class TestTaskCreate:
         """存在しない案件への作業作成は404"""
         response = client.post("/projects/1/issues/99999/tasks", data={
             "cd": "T002",
-            "name": "テスト作業",
-            "description": ""
+            "name": "テスト作業"
         })
         assert response.status_code == 404
+
+    def test_create_with_negative_hours_returns_400(self, client, issue_id):
+        """負の見積工数は400エラー"""
+        response = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
+            "cd": "NEG001",
+            "name": "負の見積",
+            "estimate_hours": "-1"
+        })
+        assert response.status_code == 400
 
 
 class TestTaskUpdate:
@@ -69,8 +75,7 @@ class TestTaskUpdate:
         # まず作業を作成
         create_resp = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
             "cd": "UPD001",
-            "name": "更新前",
-            "description": ""
+            "name": "更新前"
         })
         assert create_resp.status_code == 200
 
@@ -82,8 +87,7 @@ class TestTaskUpdate:
         # 更新
         response = client.put(f"/projects/1/issues/{issue_id}/tasks/{task_id}", data={
             "cd": "UPD001",
-            "name": "更新後",
-            "description": "更新説明"
+            "name": "更新後"
         })
         assert response.status_code == 200
         assert "更新後" in response.text
@@ -92,8 +96,7 @@ class TestTaskUpdate:
         """存在しない作業の更新は404"""
         response = client.put(f"/projects/1/issues/{issue_id}/tasks/99999", data={
             "cd": "NONE",
-            "name": "存在しない",
-            "description": ""
+            "name": "存在しない"
         })
         assert response.status_code == 404
 
@@ -106,8 +109,7 @@ class TestTaskDelete:
         # まず作業を作成
         create_resp = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
             "cd": "DEL001",
-            "name": "削除対象",
-            "description": ""
+            "name": "削除対象"
         })
         assert create_resp.status_code == 200
 
@@ -135,8 +137,7 @@ class TestTaskRow:
         # まず作業を作成
         create_resp = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
             "cd": "ROW001",
-            "name": "行テスト",
-            "description": ""
+            "name": "行テスト"
         })
         match = re.search(r'id="task-(\d+)"', create_resp.text)
         task_id = match.group(1)
@@ -159,8 +160,7 @@ class TestTaskEdit:
         # まず作業を作成
         create_resp = client.post(f"/projects/1/issues/{issue_id}/tasks", data={
             "cd": "EDT001",
-            "name": "編集テスト",
-            "description": ""
+            "name": "編集テスト"
         })
         match = re.search(r'id="task-(\d+)"', create_resp.text)
         task_id = match.group(1)
@@ -183,8 +183,7 @@ class TestTaskSearch:
         # 作業を作成
         client.post(f"/projects/1/issues/{issue_id}/tasks", data={
             "cd": "SRCH001",
-            "name": "検索対象作業",
-            "description": ""
+            "name": "検索対象作業"
         })
 
         response = client.get(f"/projects/1/issues/{issue_id}/tasks/list?q=検索対象")

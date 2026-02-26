@@ -24,24 +24,93 @@ def render_log_cell(task_id: int, user_id: int, date_str: str, hours: float, ext
     </td>'''
 
 
-def render_progress_cell(task_id: int, progress_rate) -> str:
-    """進捗率入力セルHTML生成"""
+def render_progress_cell(assignee_id: int, progress_rate) -> str:
+    """進捗率入力セルHTML生成（担当者単位）"""
     progress_display = str(progress_rate) if progress_rate is not None else ""
     return f'''<td class="progress-cell">
         <input type="number" class="progress-input" step="1" min="0" max="100"
                value="{progress_display}"
                placeholder="-"
-               data-task-id="{task_id}"
-               hx-put="/tasks/{task_id}/progress"
+               data-assignee-id="{assignee_id}"
+               hx-put="/assignments/assignees/{assignee_id}/progress"
                hx-trigger="change"
                hx-vals='js:{{progress_rate: event.target.value}}'
                hx-swap="none">
     </td>'''
 
 
-def render_row_label(issue_name: str, task_name: str, user_name: str) -> str:
+def render_estimate_cell(task_id: int, estimate_hours) -> str:
+    """見積工数入力セルHTML生成"""
+    display = f"{float(estimate_hours):.2f}" if estimate_hours else ""
+    return f'''<td class="estimate-cell">
+        <input type="number" class="estimate-input" step="0.25" min="0"
+               value="{display}"
+               data-task-id="{task_id}"
+               hx-put="/tasks/{task_id}/estimate"
+               hx-trigger="change"
+               hx-vals='js:{{estimate_hours: event.target.value}}'
+               hx-swap="none">
+    </td>'''
+
+
+def render_plan_cell(task_id: int, user_id: int, year_month: str, hours: float) -> str:
+    """月次計画入力セルHTML生成"""
+    hours_display = f"{hours:.2f}" if hours > 0 else ""
+    return f'''<td class="plan-cell">
+        <input type="number" class="plan-input" step="0.25" min="0"
+               value="{hours_display}"
+               data-task-id="{task_id}"
+               data-user-id="{user_id}"
+               data-year-month="{year_month}"
+               hx-post="/assignments/plans"
+               hx-trigger="change"
+               hx-vals='js:{{task_id: event.target.dataset.taskId, user_id: event.target.dataset.userId, year_month: event.target.dataset.yearMonth, planned_hours: event.target.value || 0}}'
+               hx-swap="none">
+    </td>'''
+
+
+def render_row_label(task_name: str) -> str:
     """行ラベルHTML生成"""
-    return f"├─ {escape(issue_name)}/{escape(task_name)} ({escape(user_name)})"
+    return f"├─ {escape(task_name)}"
+
+
+def render_user_cell(user_name: str) -> str:
+    """担当者セルHTML生成"""
+    return f'<td class="user-cell">{escape(user_name)}</td>'
+
+
+def render_task_status_cell(task_id: int, current_status: str, status_labels: dict) -> str:
+    """作業ステータスセレクトセルHTML生成（グリッド用）"""
+    current = current_status or 'open'
+    options = "".join(
+        f'<option value="{s}" {"selected" if s == current else ""}>{escape(label)}</option>'
+        for s, label in status_labels.items()
+    )
+    return f'''<td class="status-cell">
+        <select class="grid-status-select status-{current}"
+                hx-put="/tasks/{task_id}/status"
+                hx-trigger="change"
+                hx-vals='js:{{status: event.target.value}}'
+                hx-swap="none"
+                onchange="updateStatusClass(this)">{options}</select>
+    </td>'''
+
+
+def render_issue_status_cell(issue_id: int, current_status: str, status_labels: dict) -> str:
+    """案件ステータスセレクトセルHTML生成（グリッド用）"""
+    current = current_status or 'open'
+    options = "".join(
+        f'<option value="{s}" {"selected" if s == current else ""}>{escape(label)}</option>'
+        for s, label in status_labels.items()
+    )
+    return f'''<td class="status-cell">
+        <select class="grid-status-select status-{current}"
+                hx-put="/work-logs/issue-status/{issue_id}"
+                hx-trigger="change"
+                hx-vals='js:{{status: event.target.value}}'
+                hx-swap="none"
+                onchange="updateStatusClass(this)">{options}</select>
+    </td>'''
 
 
 # === CRUDアクション部品 ===

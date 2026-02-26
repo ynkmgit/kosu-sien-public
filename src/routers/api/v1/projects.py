@@ -38,7 +38,7 @@ def get_project_summary(project_id: int):
 @router.post("", response_model=ProjectOut, status_code=201)
 def create_project(body: ProjectCreate):
     """プロジェクト作成"""
-    return ProjectService.create(cd=body.cd, name=body.name, description=body.description)
+    return ProjectService.create(cd=body.cd, name=body.name)
 
 
 @router.put("/{project_id}", response_model=ProjectOut)
@@ -47,8 +47,7 @@ def update_project(project_id: int, body: ProjectUpdate):
     project = ProjectService.update(
         project_id=project_id,
         cd=body.cd,
-        name=body.name,
-        description=body.description
+        name=body.name
     )
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

@@ -123,11 +123,10 @@ def test_list_projects_with_search(client, clean_db):
     """検索付き一覧"""
     client.post("/api/v1/projects", json={
         "cd": "SRCH",
-        "name": "Searchable",
-        "description": "unique_keyword"
+        "name": "UniqueSearchable"
     })
 
-    response = client.get("/api/v1/projects?q=unique_keyword")
+    response = client.get("/api/v1/projects?q=UniqueSearchable")
     assert response.status_code == 200
     results = response.json()
     assert any(p["cd"] == "SRCH" for p in results)

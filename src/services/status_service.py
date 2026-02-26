@@ -29,23 +29,23 @@ class StatusService:
         return dict(row) if row else None
 
     @staticmethod
-    def create(project_id: int, code: str, name: str, sort_order: int = 0) -> dict:
+    def create(project_id: int, code: str, name: str, sort_order: int = 0, is_done: int = 0) -> dict:
         """ステータス作成"""
         with get_db() as conn:
             cur = conn.execute(
-                "INSERT INTO project_status (project_id, code, name, sort_order) VALUES (?, ?, ?, ?)",
-                (project_id, code, name, sort_order)
+                "INSERT INTO project_status (project_id, code, name, sort_order, is_done) VALUES (?, ?, ?, ?, ?)",
+                (project_id, code, name, sort_order, is_done)
             )
             row = conn.execute("SELECT * FROM project_status WHERE id = ?", (cur.lastrowid,)).fetchone()
         return dict(row)
 
     @staticmethod
-    def update(status_id: int, project_id: int, code: str, name: str, sort_order: int = 0) -> dict | None:
+    def update(status_id: int, project_id: int, code: str, name: str, sort_order: int = 0, is_done: int = 0) -> dict | None:
         """ステータス更新"""
         with get_db() as conn:
             cur = conn.execute(
-                "UPDATE project_status SET code = ?, name = ?, sort_order = ? WHERE id = ? AND project_id = ?",
-                (code, name, sort_order, status_id, project_id)
+                "UPDATE project_status SET code = ?, name = ?, sort_order = ?, is_done = ? WHERE id = ? AND project_id = ?",
+                (code, name, sort_order, is_done, status_id, project_id)
             )
             if cur.rowcount == 0:
                 return None
@@ -61,6 +61,19 @@ class StatusService:
                 (status_id, project_id)
             )
         return cur.rowcount > 0
+
+    @staticmethod
+    def resolve_ids_to_codes(status_ids: list[int]) -> list[str]:
+        """ステータスIDリストからユニークなコードリストを取得"""
+        if not status_ids:
+            return []
+        placeholders = ",".join("?" * len(status_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT DISTINCT code FROM project_status WHERE id IN ({placeholders})",
+                status_ids
+            ).fetchall()
+        return [r['code'] for r in rows]
 
     @staticmethod
     def is_in_use(status_id: int) -> bool:

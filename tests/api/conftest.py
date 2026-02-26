@@ -27,11 +27,11 @@ def setup_test_db():
     # テストデータ作成
     with get_db() as conn:
         # プロジェクト
-        conn.execute("INSERT INTO project (cd, name, description) VALUES ('PJ001', 'プロジェクト1', '説明1')")
-        conn.execute("INSERT INTO project (cd, name, description) VALUES ('PJ002', 'プロジェクト2', '説明2')")
+        conn.execute("INSERT INTO project (cd, name) VALUES ('PJ001', 'プロジェクト1')")
+        conn.execute("INSERT INTO project (cd, name) VALUES ('PJ002', 'プロジェクト2')")
         # ユーザー
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U001', '田中太郎', 'tanaka@example.com')")
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U002', '山田花子', 'yamada@example.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U001', '田中太郎')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U002', '山田花子')")
     yield
     # クリーンアップ
     if os.path.exists(_test_db_path):
@@ -50,36 +50,41 @@ def clean_db():
     with get_db() as conn:
         # 全テーブルクリア（依存関係順）
         conn.execute("DELETE FROM work_log")
+        conn.execute("DELETE FROM task_monthly_plan")
+        conn.execute("DELETE FROM task_tag")
         conn.execute("DELETE FROM task_assignee")
         conn.execute("DELETE FROM monthly_assignment")
         conn.execute("DELETE FROM issue_estimate_item")
         conn.execute("DELETE FROM task")
+        conn.execute("DELETE FROM issue_tag")
         conn.execute("DELETE FROM issue")
         conn.execute("DELETE FROM project_status")
         conn.execute("DELETE FROM user_attribute")
         conn.execute("DELETE FROM user")
         conn.execute("DELETE FROM project")
+        conn.execute("DELETE FROM task_status")
+        conn.execute("DELETE FROM report_template")
         # autoincrementリセット
         conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('user', 'project', 'issue', 'task')")
         # ベースデータ再作成（ID=1, 2になる）
         conn.executemany(
-            "INSERT INTO project (cd, name, description) VALUES (?, ?, ?)",
-            [("PJ001", "プロジェクト1", "説明1"), ("PJ002", "プロジェクト2", "説明2")],
+            "INSERT INTO project (cd, name) VALUES (?, ?)",
+            [("PJ001", "プロジェクト1"), ("PJ002", "プロジェクト2")],
         )
         # プロジェクトのデフォルトステータス
         default_statuses = [
-            ("open", "未着手", 0),
-            ("in_progress", "進行中", 1),
-            ("done", "完了", 2),
+            ("open", "未着手", 0, 0),
+            ("in_progress", "進行中", 1, 0),
+            ("done", "完了", 2, 1),
         ]
         for project_id in [1, 2]:
-            for code, name, order in default_statuses:
+            for code, name, order, is_done in default_statuses:
                 conn.execute(
-                    "INSERT INTO project_status (project_id, code, name, sort_order) VALUES (?, ?, ?, ?)",
-                    (project_id, code, name, order)
+                    "INSERT INTO project_status (project_id, code, name, sort_order, is_done) VALUES (?, ?, ?, ?, ?)",
+                    (project_id, code, name, order, is_done)
                 )
         conn.executemany(
-            "INSERT INTO user (cd, name, email) VALUES (?, ?, ?)",
-            [("U001", "田中太郎", "tanaka@example.com"), ("U002", "山田花子", "yamada@example.com")],
+            "INSERT INTO user (cd, name) VALUES (?, ?)",
+            [("U001", "田中太郎"), ("U002", "山田花子")],
         )
     yield

@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import HTMLResponse
 from services import IssueService
-from .common import templates, get_project_or_404, get_rate_class, render_edit_actions, render_sortable_th
+from .common import get_project_or_404, get_rate_class, render_edit_actions, render_sortable_th
 
 router = APIRouter(prefix="/projects/{project_id}/issues", tags=["issues"])
 
@@ -40,7 +40,6 @@ def render_thead(sort: str, order: str, project_id: int):
         <th class="col-rate">実績</th>
         <th class="col-rate">残</th>
         <th class="col-rate">消化率</th>
-        {col("description", "説明")}
         <th class="col-name">操作</th>
     </tr>"""
 
@@ -81,7 +80,6 @@ def render_row(i, project_id: int, status_labels: dict, estimate_total: float = 
     """案件行HTML生成"""
     cd = escape(i['cd'] or '')
     name = escape(i['name'])
-    desc = escape(i['description'] or '')
     status = i['status'] or 'open'
     comp = IssueService.calculate_comparison(estimate_total, actual_total)
     estimate_display, actual_display, remaining_display, rate_display = format_comparison_display(comp)
@@ -93,7 +91,7 @@ def render_row(i, project_id: int, status_labels: dict, estimate_total: float = 
         )
         base_path = f"/projects/{project_id}/issues"
         return f"""
-        <tr id="issue-{i['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="issue-{i['id']}" class="editing-row">
             <td><input type="text" name="cd" value="{cd}" class="edit-input"></td>
             <td><input type="text" name="name" value="{name}" class="edit-input"></td>
             <td><select name="status" class="edit-input">{status_options}</select></td>
@@ -101,7 +99,6 @@ def render_row(i, project_id: int, status_labels: dict, estimate_total: float = 
             <td class="col-rate">{actual_display}</td>
             <td class="col-rate">{remaining_display}</td>
             <td class="col-rate">{rate_display}</td>
-            <td><input type="text" name="description" value="{desc}" class="edit-input"></td>
             <td>{render_edit_actions("issue", i['id'], base_path)}</td>
         </tr>"""
 
@@ -109,36 +106,17 @@ def render_row(i, project_id: int, status_labels: dict, estimate_total: float = 
     return f"""
     <tr id="issue-{i['id']}">
         <td class="cd-cell">{cd}</td>
-        <td class="name-cell">{name}</td>
+        <td class="name-cell"><a href="/projects/{project_id}/issues/{i['id']}/tasks" class="link-plain">{name}</a></td>
         <td>{status_select}</td>
         <td class="col-rate">{estimate_display}</td>
         <td class="col-rate">{actual_display}</td>
         <td class="col-rate">{remaining_display}</td>
         <td class="col-rate">{rate_display}</td>
-        <td class="desc-cell">{desc}</td>
         <td><div class="actions-cell">
-            <a href="/projects/{project_id}/issues/{i['id']}/estimates" class="btn btn-sm btn-ghost">見積</a>
-            <a href="/projects/{project_id}/issues/{i['id']}/tasks" class="btn btn-sm btn-ghost">作業</a>
+            <a href="/projects/{project_id}/issues/{i['id']}/tasks" class="btn btn-sm btn-primary">作業管理</a>
             <button hx-get="/projects/{project_id}/issues/{i['id']}/edit" hx-target="#issue-{i['id']}" hx-swap="outerHTML" class="btn btn-sm btn-ghost">編集</button>
         </div></td>
     </tr>"""
-
-
-@router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    project_id: int,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
-    proj = get_project_or_404(project_id)
-    filter_params = {"user": user, "project": project, "issue": issue}
-    return templates.TemplateResponse(request, "issues.html", {
-        "active": "projects",
-        "project": proj,
-        "filter_params": filter_params,
-    })
 
 
 @router.get("/list", response_class=HTMLResponse)
@@ -178,21 +156,21 @@ def edit_row(project_id: int, id: int):
 
 
 @router.post("", response_class=HTMLResponse)
-def create(project_id: int, cd: str = Form(...), name: str = Form(...), status: str = Form("open"), description: str = Form("")):
+def create(project_id: int, cd: str = Form(...), name: str = Form(...), status: str = Form("open")):
     get_project_or_404(project_id)
-    i = IssueService.create(project_id=project_id, cd=cd, name=name, status=status, description=description)
+    i = IssueService.create(project_id=project_id, cd=cd, name=name, status=status)
     status_labels = IssueService.get_status_labels(project_id)
     return HTMLResponse(render_row(i, project_id, status_labels, 0))  # 新規作成時は見積0
 
 
 @router.put("/{id}", response_class=HTMLResponse)
-def update(project_id: int, id: int, cd: str = Form(...), name: str = Form(...), status: str = Form("open"), description: str = Form("")):
+def update(project_id: int, id: int, cd: str = Form(...), name: str = Form(...), status: str = Form("open")):
     get_project_or_404(project_id)
     # 案件がこのprojectに属しているか確認
     existing = IssueService.get_by_id(id)
     if not existing or existing['project_id'] != project_id:
         raise HTTPException(status_code=404, detail="Issue not found")
-    i = IssueService.update(issue_id=id, cd=cd, name=name, status=status, description=description)
+    i = IssueService.update(issue_id=id, cd=cd, name=name, status=status)
     status_labels = IssueService.get_status_labels(project_id)
     estimate_total = IssueService.get_estimate_total(id)
     actual_total = IssueService.get_actual_total(id)
@@ -208,7 +186,7 @@ def update_status(project_id: int, id: int, status: str = Form(...)):
     if not existing or existing['project_id'] != project_id:
         raise HTTPException(status_code=404, detail="Issue not found")
     # 既存の値を保持してステータスのみ更新
-    i = IssueService.update(issue_id=id, cd=existing['cd'], name=existing['name'], status=status, description=existing['description'] or "")
+    i = IssueService.update(issue_id=id, cd=existing['cd'], name=existing['name'], status=status)
     status_labels = IssueService.get_status_labels(project_id)
     estimate_total = IssueService.get_estimate_total(id)
     actual_total = IssueService.get_actual_total(id)

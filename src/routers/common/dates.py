@@ -2,6 +2,7 @@
 
 責務: 月・週の計算、パース、フォーマット
 """
+import calendar
 from datetime import datetime, date, timedelta
 
 from fastapi import HTTPException
@@ -21,6 +22,14 @@ def parse_month(month_str: str) -> str:
         return parsed.strftime("%Y-%m")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
+
+
+def get_month_dates(year_month: str) -> list[date]:
+    """指定月の全日付リストを取得"""
+    dt = datetime.strptime(year_month, "%Y-%m")
+    year, month = dt.year, dt.month
+    _, last_day = calendar.monthrange(year, month)
+    return [date(year, month, d) for d in range(1, last_day + 1)]
 
 
 def get_prev_next_month(year_month: str) -> tuple[str, str]:

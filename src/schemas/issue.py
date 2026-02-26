@@ -8,7 +8,6 @@ class IssueCreate(BaseModel):
     cd: str
     name: str
     status: str = "open"
-    description: str = ""
 
 
 class IssueUpdate(BaseModel):
@@ -16,7 +15,6 @@ class IssueUpdate(BaseModel):
     cd: str
     name: str
     status: str
-    description: str = ""
 
 
 class IssueOut(BaseModel):
@@ -25,7 +23,6 @@ class IssueOut(BaseModel):
     cd: str
     name: str
     status: str | None
-    description: str | None
     project_id: int
     project_cd: str | None = None
     project_name: str | None = None

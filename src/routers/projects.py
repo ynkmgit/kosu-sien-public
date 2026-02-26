@@ -7,7 +7,7 @@ from html import escape
 
 from fastapi import APIRouter, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from services import ProjectService
+from services import ProjectService, IssueService
 from .common import templates, render_edit_actions, render_sortable_th, get_project_or_404
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -34,7 +34,7 @@ def render_row(p, editing=False):
 
     if editing:
         return f"""
-        <tr id="project-{p['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="project-{p['id']}" class="editing-row">
             <td><input type="text" name="cd" value="{cd}" class="edit-input"></td>
             <td><input type="text" name="name" value="{name}" class="edit-input"></td>
             <td><input type="text" name="description" value="{desc}" class="edit-input"></td>
@@ -43,7 +43,7 @@ def render_row(p, editing=False):
     return f"""
     <tr id="project-{p['id']}">
         <td class="cd-cell">{cd}</td>
-        <td class="name-cell"><a href="/projects/{p['id']}" style="color: inherit; text-decoration: none;">{name}</a></td>
+        <td class="name-cell"><a href="/projects/{p['id']}" class="link-plain">{name}</a></td>
         <td class="desc-cell">{desc}</td>
         <td><div class="actions-cell">
             <a href="/projects/{p['id']}" class="btn btn-sm btn-primary">詳細</a>
@@ -57,9 +57,10 @@ def page(
     request: Request,
     user: list[int] = Query(default=[]),
     project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
+    issue: list[int] = Query(default=[]),
+    fold: str = Query(default=""),
 ):
-    filter_params = {"user": user, "project": project, "issue": issue}
+    filter_params = {"user": user, "project": project, "issue": issue, "fold": fold}
     return templates.TemplateResponse(request, "projects.html", {
         "active": "projects", "filter_params": filter_params
     })
@@ -76,17 +77,17 @@ def list_all(sort: str = "cd", order: str = "asc", q: str = ""):
 
 @router.get("/{id}", response_class=HTMLResponse)
 def detail(request: Request, id: int):
-    """プロジェクト詳細画面"""
+    """プロジェクト詳細画面（案件管理統合）"""
     project = ProjectService.get_by_id(id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     summary = ProjectService.get_summary(id)
-    recent_issues = ProjectService.get_recent_issues(id)
+    status_labels = IssueService.get_status_labels(id)
     return templates.TemplateResponse(request, "project_detail.html", {
         "active": "projects",
         "project": project,
         "summary": summary,
-        "recent_issues": recent_issues,
+        "status_labels": status_labels,
     })
 
 

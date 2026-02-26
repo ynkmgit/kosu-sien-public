@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import StatusService
-from .common import templates, get_project_or_404, render_edit_actions
+from .common import templates, get_project_or_404, render_edit_actions, FilterParams, get_filter_params
 
 router = APIRouter(prefix="/projects/{project_id}/statuses", tags=["statuses"])
 
@@ -18,22 +18,27 @@ def render_row(s, project_id: int, editing=False):
     code = escape(s['code'])
     name = escape(s['name'])
     sort_order = s['sort_order']
+    is_done = s.get('is_done', 0)
 
     if editing:
         base_path = f"/projects/{project_id}/statuses"
+        checked = "checked" if is_done else ""
         return f"""
-        <tr id="status-{s['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="status-{s['id']}" class="editing-row">
             <td><input type="text" name="code" value="{code}" class="edit-input"></td>
             <td><input type="text" name="name" value="{name}" class="edit-input"></td>
             <td><input type="number" name="sort_order" value="{sort_order}" class="edit-input" step="1" min="0"></td>
+            <td class="center-cell"><input type="checkbox" name="is_done" value="1" {checked} class="edit-checkbox"></td>
             <td>{render_edit_actions("status", s['id'], base_path)}</td>
         </tr>"""
 
+    done_badge = ' <span class="done-badge">完了</span>' if is_done else ""
     return f"""
     <tr id="status-{s['id']}">
         <td class="cd-cell">{code}</td>
         <td class="name-cell">{name}</td>
         <td>{sort_order}</td>
+        <td class="center-cell">{done_badge}</td>
         <td><div class="actions-cell">
             <button hx-get="/projects/{project_id}/statuses/{s['id']}/edit" hx-target="#status-{s['id']}" hx-swap="outerHTML" class="btn btn-sm btn-ghost">編集</button>
         </div></td>
@@ -41,19 +46,12 @@ def render_row(s, project_id: int, editing=False):
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    project_id: int,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
+def page(request: Request, project_id: int, filters: FilterParams = Depends(get_filter_params)):
     proj = get_project_or_404(project_id)
-    filter_params = {"user": user, "project": project, "issue": issue}
     return templates.TemplateResponse(request, "statuses.html", {
         "active": "projects",
         "project": proj,
-        "filter_params": filter_params,
+        "filter_params": filters.to_dict(),
     })
 
 
@@ -85,16 +83,16 @@ def edit_row(project_id: int, id: int):
 
 
 @router.post("", response_class=HTMLResponse)
-def create(project_id: int, code: str = Form(...), name: str = Form(...), sort_order: int = Form(0)):
+def create(project_id: int, code: str = Form(...), name: str = Form(...), sort_order: int = Form(0), is_done: int = Form(0)):
     get_project_or_404(project_id)
-    s = StatusService.create(project_id, code, name, sort_order)
+    s = StatusService.create(project_id, code, name, sort_order, is_done)
     return HTMLResponse(render_row(s, project_id))
 
 
 @router.put("/{id}", response_class=HTMLResponse)
-def update(project_id: int, id: int, code: str = Form(...), name: str = Form(...), sort_order: int = Form(0)):
+def update(project_id: int, id: int, code: str = Form(...), name: str = Form(...), sort_order: int = Form(0), is_done: int = Form(0)):
     get_project_or_404(project_id)
-    s = StatusService.update(id, project_id, code, name, sort_order)
+    s = StatusService.update(id, project_id, code, name, sort_order, is_done)
     if not s:
         raise HTTPException(status_code=404, detail="Status not found")
     return HTMLResponse(render_row(s, project_id))

@@ -6,12 +6,12 @@
 from datetime import datetime
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import MonthlyAssignmentService, UserService, ProjectService
 from .common import (
     templates, get_current_month, parse_month, get_prev_next_month,
-    get_rate_class
+    get_rate_class, FilterParams, get_filter_params
 )
 
 router = APIRouter(prefix="/monthly-assignments", tags=["monthly_assignments"])
@@ -25,9 +25,9 @@ def _render_navigation(year_month: str, mode: str) -> str:
 
     simple_active = "btn-primary" if mode == "simple" else "btn-ghost"
     detail_active = "btn-primary" if mode == "detail" else "btn-ghost"
-    mode_toggle = f'''<div style="display: flex; gap: 8px;">
-        <a href="/monthly-assignments?month={year_month}&mode=simple" class="btn {simple_active}" style="font-size: 0.8rem; padding: 4px 12px;">簡易</a>
-        <a href="/monthly-assignments?month={year_month}&mode=detail" class="btn {detail_active}" style="font-size: 0.8rem; padding: 4px 12px;">詳細</a>
+    mode_toggle = f'''<div class="mode-toggle">
+        <a href="/monthly-assignments?month={year_month}&mode=simple" class="btn {simple_active}">簡易</a>
+        <a href="/monthly-assignments?month={year_month}&mode=detail" class="btn {detail_active}">詳細</a>
     </div>'''
 
     return f'''<div class="grid-nav">
@@ -65,21 +65,21 @@ def _render_detail_stats(planned: float, actual: float) -> str:
         rate = (actual / planned) * 100
         remaining_display = f"{remaining:.1f}h"
         rate_display = f"{rate:.0f}%"
-        remaining_style = ' style="color: var(--danger);"' if remaining < 0 else ""
+        remaining_class = ' class="text-danger"' if remaining < 0 else ""
         rate_class = get_rate_class(rate)
     else:
         remaining_display = "-"
         rate_display = "-"
-        remaining_style = ""
+        remaining_class = ""
         rate_class = ""
 
-    return f'''<div style="font-size: 0.75rem; color: var(--text-muted);">予定</div>
-        <div style="font-weight: 500;">{planned_display}</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">実績</div>
-        <div style="font-weight: 500;">{actual_display}</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">残</div>
-        <div{remaining_style}>{remaining_display}</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">消化率</div>
+    return f'''<div class="detail-label">予定</div>
+        <div class="detail-value">{planned_display}</div>
+        <div class="detail-label-mt">実績</div>
+        <div class="detail-value">{actual_display}</div>
+        <div class="detail-label-mt">残</div>
+        <div{remaining_class}>{remaining_display}</div>
+        <div class="detail-label-mt">消化率</div>
         <div class="{rate_class}">{rate_display}</div>'''
 
 
@@ -111,9 +111,9 @@ def _render_total_row(projects, project_totals: dict, grand_totals: dict, mode: 
             actual = pt['actual']
             planned_display = f"{planned:.1f}h" if planned > 0 else "-"
             actual_display = f"{actual:.1f}h" if actual > 0 else "-"
-            total_cells.append(f'''<td class="col-total" style="padding: 4px 8px; vertical-align: top;">
-                <div style="font-size: 0.75rem;">予定: {planned_display}</div>
-                <div style="font-size: 0.75rem;">実績: {actual_display}</div>
+            total_cells.append(f'''<td class="col-total detail-cell-plain">
+                <div class="detail-summary">予定: {planned_display}</div>
+                <div class="detail-summary">実績: {actual_display}</div>
             </td>''')
         else:
             hours_display = f"{pt['planned']:.1f}h" if pt['planned'] > 0 else "-"
@@ -122,9 +122,9 @@ def _render_total_row(projects, project_totals: dict, grand_totals: dict, mode: 
     if mode == "detail":
         grand_planned = f"{grand_totals['planned']:.1f}h" if grand_totals['planned'] > 0 else "-"
         grand_actual = f"{grand_totals['actual']:.1f}h" if grand_totals['actual'] > 0 else "-"
-        grand_cell = f'''<td class="grand-total" style="padding: 4px 8px; vertical-align: top;">
-            <div style="font-size: 0.75rem;">予定: {grand_planned}</div>
-            <div style="font-size: 0.75rem;">実績: {grand_actual}</div>
+        grand_cell = f'''<td class="grand-total detail-cell-plain">
+            <div class="detail-summary">予定: {grand_planned}</div>
+            <div class="detail-summary">実績: {grand_actual}</div>
         </td>'''
     else:
         grand_display = f"{grand_totals['planned']:.1f}h" if grand_totals['planned'] > 0 else "-"
@@ -138,7 +138,10 @@ def _render_total_row(projects, project_totals: dict, grand_totals: dict, mode: 
 
 
 def render_grid(year_month: str, users, projects, assignments, actuals=None, mode: str = "simple"):
-    """グリッドHTML生成"""
+    """グリッドHTML生成
+
+    責務: HTML生成のみ（集計計算はサービス層に委譲）
+    """
     if not users:
         return '<p class="empty-message">有効なユーザーがいません</p>'
     if not projects:
@@ -150,38 +153,34 @@ def render_grid(year_month: str, users, projects, assignments, actuals=None, mod
     nav = _render_navigation(year_month, mode)
     header = _render_header(projects)
 
-    # 集計用
-    rows = []
-    project_totals = {p['id']: {'planned': 0.0, 'actual': 0.0} for p in projects}
-    grand_totals = {'planned': 0.0, 'actual': 0.0}
+    # 集計をサービス層から取得
+    user_totals, project_totals, grand_totals = MonthlyAssignmentService.calculate_grid_totals(
+        users, projects, assignments, actuals
+    )
 
     # ユーザー行生成
+    rows = []
     for user in users:
         cells = []
-        user_totals = {'planned': 0.0, 'actual': 0.0}
+        uid = user['id']
 
         for project in projects:
-            assignment = assignments.get((user['id'], project['id']))
+            pid = project['id']
+            assignment = assignments.get((uid, pid))
             planned = assignment['hours'] if assignment else 0
-            actual = actuals.get((user['id'], project['id']), 0)
-            user_totals['planned'] += planned
-            user_totals['actual'] += actual
-            project_totals[project['id']]['planned'] += planned
-            project_totals[project['id']]['actual'] += actual
+            actual = actuals.get((uid, pid), 0)
 
             if mode == "detail":
-                cells.append(f'<td class="assign-cell" style="padding: 4px 8px; vertical-align: top; min-width: 80px;">{_render_detail_stats(planned, actual)}</td>')
+                cells.append(f'<td class="assign-cell detail-cell">{_render_detail_stats(planned, actual)}</td>')
             else:
-                cells.append(_render_simple_cell(user['id'], project['id'], planned, year_month))
+                cells.append(_render_simple_cell(uid, pid, planned, year_month))
 
-        grand_totals['planned'] += user_totals['planned']
-        grand_totals['actual'] += user_totals['actual']
-
+        ut = user_totals[uid]
         if mode == "detail":
-            row_total = f'<td class="row-total" style="padding: 4px 8px; vertical-align: top;">{_render_detail_stats(user_totals["planned"], user_totals["actual"])}</td>'
+            row_total = f'<td class="row-total detail-cell-plain">{_render_detail_stats(ut["planned"], ut["actual"])}</td>'
         else:
-            mm_total = f"{user_totals['planned'] / 160:.2f}MM" if user_totals['planned'] > 0 else ""
-            hours_total = f"{user_totals['planned']:.1f}h" if user_totals['planned'] > 0 else "-"
+            mm_total = f"{ut['planned'] / 160:.2f}MM" if ut['planned'] > 0 else ""
+            hours_total = f"{ut['planned']:.1f}h" if ut['planned'] > 0 else "-"
             row_total = f'<td class="row-total"><div class="total-hours">{hours_total}</div><div class="total-mm">{mm_total}</div></td>'
 
         rows.append(f'''<tr class="user-row">
@@ -202,14 +201,7 @@ def render_grid(year_month: str, users, projects, assignments, actuals=None, mod
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    month: str = None,
-    mode: str = "simple",
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
+def page(request: Request, month: str = None, mode: str = "simple", filters: FilterParams = Depends(get_filter_params)):
     """月次アサインページ"""
     if month:
         year_month = parse_month(month)
@@ -220,12 +212,11 @@ def page(
     if mode not in ("simple", "detail"):
         mode = "simple"
 
-    filter_params = {"user": user, "project": project, "issue": issue}
     return templates.TemplateResponse(request, "monthly_assignments.html", {
         "active": "monthly_assignments",
         "year_month": year_month,
         "mode": mode,
-        "filter_params": filter_params,
+        "filter_params": filters.to_dict(),
     })
 
 

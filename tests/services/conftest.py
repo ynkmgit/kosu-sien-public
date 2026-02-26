@@ -33,16 +33,21 @@ def clean_db():
     """テストデータリセット"""
     with get_db() as conn:
         conn.execute("DELETE FROM work_log")
+        conn.execute("DELETE FROM task_monthly_plan")
+        conn.execute("DELETE FROM task_tag")
         conn.execute("DELETE FROM task_assignee")
         conn.execute("DELETE FROM issue_estimate_item")
         conn.execute("DELETE FROM task")
+        conn.execute("DELETE FROM issue_tag")
         conn.execute("DELETE FROM issue")
         conn.execute("DELETE FROM project_status")
         conn.execute("DELETE FROM project")
         conn.execute("DELETE FROM user_attribute")
         conn.execute("DELETE FROM user")
+        conn.execute("DELETE FROM task_status")
+        conn.execute("DELETE FROM report_template")
         conn.executemany(
-            "INSERT INTO user (cd, name, email) VALUES (?, ?, ?)",
-            [("U001", "田中太郎", "tanaka@example.com"), ("U002", "山田花子", "yamada@example.com")],
+            "INSERT INTO user (cd, name) VALUES (?, ?)",
+            [("U001", "田中太郎"), ("U002", "山田花子")],
         )
     yield

@@ -8,11 +8,15 @@ from .issue_estimates import router as issue_estimates_router
 from .task_assignees import router as task_assignees_router
 from .monthly_assignments import router as monthly_assignments_router
 from .work_logs import router as work_logs_router
+from .assignments import router as assignments_router
 from .work_report import router as work_report_router
 from .search import router as search_router
 from .user_attribute_types import router as user_attribute_types_router
 from .user_attribute_options import router as user_attribute_options_router
 from .user_settings import router as user_settings_router
+from .report_templates import router as report_templates_router
+from .task_statuses import router as task_statuses_router
+from .issue_tags import router as issue_tags_router
 from .api import api_v1_router
 
 __all__ = [
@@ -25,11 +29,15 @@ __all__ = [
     "task_assignees_router",
     "monthly_assignments_router",
     "work_logs_router",
+    "assignments_router",
     "work_report_router",
     "search_router",
     "task_progress_router",
     "user_attribute_types_router",
     "user_attribute_options_router",
     "user_settings_router",
+    "report_templates_router",
+    "task_statuses_router",
+    "issue_tags_router",
     "api_v1_router",
 ]

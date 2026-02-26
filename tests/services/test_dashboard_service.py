@@ -22,7 +22,7 @@ def test_get_today_hours_with_data(clean_db):
         task_id1 = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute("INSERT INTO task (issue_id, cd, name) VALUES (?, 'T2', 'Task2')", (issue_id,))
         task_id2 = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U1', 'User1', 'u1@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U1', 'User1')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         # 同日の別タスクに工数記録
         conn.execute(
@@ -50,7 +50,7 @@ def test_get_monthly_stats_with_data(clean_db):
     with get_db() as conn:
         conn.execute("INSERT INTO project (cd, name) VALUES ('P2', 'Project2')")
         project_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        conn.execute("INSERT INTO user (cd, name, email) VALUES ('U2', 'User2', 'u2@test.com')")
+        conn.execute("INSERT INTO user (cd, name) VALUES ('U2', 'User2')")
         user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
         # 月次アサイン
@@ -86,8 +86,8 @@ def test_get_counts(clean_db):
 def test_get_counts_with_inactive_users(clean_db):
     """無効ユーザーは除外"""
     with get_db() as conn:
-        conn.execute("INSERT INTO user (cd, name, email, is_active) VALUES ('ACTIVE', 'Active', 'a@test.com', 1)")
-        conn.execute("INSERT INTO user (cd, name, email, is_active) VALUES ('INACTIVE', 'Inactive', 'i@test.com', 0)")
+        conn.execute("INSERT INTO user (cd, name, is_active) VALUES ('ACTIVE', 'Active', 1)")
+        conn.execute("INSERT INTO user (cd, name, is_active) VALUES ('INACTIVE', 'Inactive', 0)")
 
     result = DashboardService.get_counts()
     # 有効ユーザーのみカウントされる

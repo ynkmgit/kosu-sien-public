@@ -5,10 +5,10 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import UserAttributeOptionService
-from .common import templates, render_edit_actions, get_attribute_type_or_404
+from .common import templates, render_edit_actions, get_attribute_type_or_404, FilterParams, get_filter_params
 
 router = APIRouter(prefix="/user-attribute-types/{type_id}/options", tags=["user-attribute-options"])
 
@@ -22,7 +22,7 @@ def render_row(o, type_id: int, editing=False):
     if editing:
         base_path = f"/user-attribute-types/{type_id}/options"
         return f"""
-        <tr id="attr-option-{o['id']}" style="background: rgba(212, 165, 116, 0.08);">
+        <tr id="attr-option-{o['id']}" class="editing-row">
             <td><input type="text" name="code" value="{code}" class="edit-input"></td>
             <td><input type="text" name="name" value="{name}" class="edit-input"></td>
             <td><input type="number" name="sort_order" value="{sort_order}" class="edit-input" step="1" min="0"></td>
@@ -41,19 +41,12 @@ def render_row(o, type_id: int, editing=False):
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    type_id: int,
-    user: list[int] = Query(default=[]),
-    project: list[int] = Query(default=[]),
-    issue: list[int] = Query(default=[])
-):
+def page(request: Request, type_id: int, filters: FilterParams = Depends(get_filter_params)):
     attr_type = get_attribute_type_or_404(type_id)
-    filter_params = {"user": user, "project": project, "issue": issue}
     return templates.TemplateResponse(request, "user_attribute_options.html", {
         "active": "user-attributes",
         "attr_type": attr_type,
-        "filter_params": filter_params,
+        "filter_params": filters.to_dict(),
     })
 
 
