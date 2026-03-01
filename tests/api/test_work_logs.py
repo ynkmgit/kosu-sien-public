@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from database import get_db
-from services import WorkLogService
+from services import WorkLogService, TaskAssigneeService
 
 
 @pytest.fixture
@@ -240,11 +240,7 @@ class TestProgressRate:
     @pytest.fixture
     def assignee_id(self, client, project_id, task_id, user_id):
         """担当割当を作成してassignee_idを返す"""
-        response = client.post("/assignments/assignees", data={
-            "task_id": str(task_id),
-            "user_id": str(user_id)
-        })
-        return response.json()["assignee_id"]
+        return TaskAssigneeService.create(task_id, user_id)
 
     def test_update_progress(self, client, assignee_id):
         """進捗率更新が成功する"""
@@ -391,7 +387,7 @@ class TestGridWithTotals:
         """グリッドに案件行が表示される"""
         response = client.get("/work-logs/grid")
         assert response.status_code == 200
-        assert 'class="issue-row"' in response.text
+        assert 'issue-row' in response.text
         assert 'toggleIssue(' in response.text
 
     def test_grid_shows_bulk_actions(self, client, assigned_task):
@@ -407,7 +403,7 @@ class TestGridWithTotals:
         """グリッドに集計セルが表示される"""
         response = client.get("/work-logs/grid")
         assert response.status_code == 200
-        assert 'class="summary-cell' in response.text
+        assert 'summary-cell' in response.text
 
     def test_grid_project_row_has_data_attribute(self, client, assigned_task):
         """プロジェクト行にdata-project-id属性がある"""
@@ -420,5 +416,5 @@ class TestGridWithTotals:
         response = client.get("/work-logs/grid")
         assert response.status_code == 200
         # issue-rowにdata-project-idとdata-issue-idがあることを確認
-        assert re.search(r'class="issue-row"[^>]*data-project-id=', response.text)
-        assert re.search(r'class="issue-row"[^>]*data-issue-id=', response.text)
+        assert re.search(r'class="[^"]*issue-row[^"]*"[^>]*data-project-id=', response.text)
+        assert re.search(r'class="[^"]*issue-row[^"]*"[^>]*data-issue-id=', response.text)

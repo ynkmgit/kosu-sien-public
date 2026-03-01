@@ -2,6 +2,7 @@
 
 責務: フィルター関連のHTML生成 + ステータス収集
 """
+from datetime import datetime
 from html import escape
 
 from services import StatusService, TaskStatusService
@@ -72,30 +73,28 @@ def render_exclude_done_toggles(exclude_done_issue: bool, exclude_done_task: boo
     </div>'''
 
 
-def collect_unique_issue_statuses(projects: list[dict]) -> list[dict]:
-    """全プロジェクトの案件ステータスを収集（code重複排除、ID付き）"""
+def _collect_unique_statuses(items: list[dict], get_all_fn) -> list[dict]:
+    """ステータスを収集（code重複排除、ID付き）"""
+    item_ids = [item['id'] for item in items]
+    all_statuses = get_all_fn(item_ids)
     seen = set()
     result = []
-    for p in projects:
-        statuses = StatusService.get_all(p['id'])
-        for s in statuses:
+    for item_id in item_ids:
+        for s in all_statuses.get(item_id, []):
             if s['code'] not in seen:
                 seen.add(s['code'])
                 result.append({'id': s['id'], 'name': s['name']})
     return result
+
+
+def collect_unique_issue_statuses(projects: list[dict]) -> list[dict]:
+    """全プロジェクトの案件ステータスを収集（code重複排除、ID付き）"""
+    return _collect_unique_statuses(projects, StatusService.get_all_bulk)
 
 
 def collect_unique_task_statuses(issues: list[dict]) -> list[dict]:
     """全案件の作業ステータスを収集（code重複排除、ID付き）"""
-    seen = set()
-    result = []
-    for i in issues:
-        statuses = TaskStatusService.get_all(i['id'])
-        for s in statuses:
-            if s['code'] not in seen:
-                seen.add(s['code'])
-                result.append({'id': s['id'], 'name': s['name']})
-    return result
+    return _collect_unique_statuses(issues, TaskStatusService.get_all_bulk)
 
 
 def render_common_filter_groups(users, projects, issues, tags,
@@ -125,6 +124,36 @@ def render_common_filter_groups(users, projects, issues, tags,
     )
     exclude_done_group = render_exclude_done_toggles(exclude_done_issue, exclude_done_task)
     return f"{user_group}{project_group}{issue_group}{tag_group}{issue_status_group}{task_status_group}{exclude_done_group}"
+
+
+def render_assignment_month_nav(base_month: str = None) -> str:
+    """アサイン管理の月ナビゲーション生成"""
+    now = datetime.now()
+    if base_month:
+        year, month = int(base_month[:4]), int(base_month[5:7])
+    else:
+        year, month = now.year, now.month
+
+    prev_m, prev_y = month - 1, year
+    if prev_m < 1:
+        prev_m, prev_y = 12, year - 1
+    next_m, next_y = month + 1, year
+    if next_m > 12:
+        next_m, next_y = 1, year + 1
+
+    prev_ym = f"{prev_y}-{prev_m:02d}"
+    next_ym = f"{next_y}-{next_m:02d}"
+    display = f"{year}年{month}月 〜"
+
+    return f'''<div class="filter-group">
+        <label class="filter-label">基準月</label>
+        <div class="week-nav">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="changeBaseMonth('{prev_ym}')">◀</button>
+            <span class="week-range">{display}</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="changeBaseMonth('{next_ym}')">▶</button>
+            <button type="button" class="btn btn-ghost btn-sm ml-sm" onclick="changeBaseMonth('')">当月</button>
+        </div>
+    </div>'''
 
 
 def render_view_toggle(current_view: str) -> str:

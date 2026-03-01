@@ -1,5 +1,5 @@
 """加重平均進捗率の計算テスト"""
-from routers.common.assignment_grid_renderer import _calc_weighted_progress
+from services.assignment_aggregation_service import calc_weighted_progress as _calc_weighted_progress
 
 
 def test_all_none():

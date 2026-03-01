@@ -169,6 +169,22 @@ class IssueService:
         return {r['code']: r['name'] for r in rows}
 
     @staticmethod
+    def get_status_labels_bulk(project_ids: list[int]) -> dict[int, dict[str, str]]:
+        """複数プロジェクトのステータスラベルを一括取得"""
+        if not project_ids:
+            return {}
+        placeholders = ",".join("?" * len(project_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT project_id, code, name FROM project_status WHERE project_id IN ({placeholders}) ORDER BY sort_order",
+                project_ids
+            ).fetchall()
+        result: dict[int, dict[str, str]] = {pid: {} for pid in project_ids}
+        for r in rows:
+            result[r['project_id']][r['code']] = r['name']
+        return result
+
+    @staticmethod
     def get_estimate_totals(project_id: int) -> dict[int, float]:
         """プロジェクト内の案件ごとの見積合計を取得（issue_id -> total辞書）"""
         with get_db() as conn:

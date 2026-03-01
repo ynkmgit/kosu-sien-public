@@ -166,6 +166,21 @@ def test_toggle_remove(clean_db):
     assert TaskAssigneeService.get_assignment(task_id, user_id) is None
 
 
+def test_get_user_ids_for_task_empty(clean_db):
+    """担当なしで空リスト"""
+    _, task_id, _ = _setup_project_with_task()
+    result = TaskAssigneeService.get_user_ids_for_task(task_id)
+    assert result == []
+
+
+def test_get_user_ids_for_task(clean_db):
+    """担当ユーザーIDリスト取得"""
+    _, task_id, user_id = _setup_project_with_task()
+    TaskAssigneeService.create(task_id, user_id)
+    result = TaskAssigneeService.get_user_ids_for_task(task_id)
+    assert result == [user_id]
+
+
 def test_toggle_twice(clean_db):
     """トグル2回で元に戻る"""
     project_id, task_id, user_id = _setup_project_with_task()

@@ -19,6 +19,38 @@ class TaskStatusService:
         return [dict(r) for r in rows]
 
     @staticmethod
+    def get_all_bulk(issue_ids: list[int]) -> dict[int, list[dict]]:
+        """複数案件の作業ステータス一覧を一括取得"""
+        if not issue_ids:
+            return {}
+        placeholders = ",".join("?" * len(issue_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM task_status WHERE issue_id IN ({placeholders}) ORDER BY issue_id, sort_order ASC",
+                issue_ids
+            ).fetchall()
+        result: dict[int, list[dict]] = {iid: [] for iid in issue_ids}
+        for r in rows:
+            result[r['issue_id']].append(dict(r))
+        return result
+
+    @staticmethod
+    def get_status_labels_bulk(issue_ids: list[int]) -> dict[int, dict[str, str]]:
+        """複数案件の作業ステータスラベルを一括取得"""
+        if not issue_ids:
+            return {}
+        placeholders = ",".join("?" * len(issue_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT issue_id, code, name FROM task_status WHERE issue_id IN ({placeholders}) ORDER BY sort_order",
+                issue_ids
+            ).fetchall()
+        result: dict[int, dict[str, str]] = {iid: {} for iid in issue_ids}
+        for r in rows:
+            result[r['issue_id']][r['code']] = r['name']
+        return result
+
+    @staticmethod
     def get_by_id(status_id: int, issue_id: int) -> dict | None:
         """作業ステータスをIDで取得"""
         with get_db() as conn:

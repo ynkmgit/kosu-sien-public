@@ -189,20 +189,22 @@ function toggleIssue(projectId, issueId) {
 }
 
 function applyFold(mode) {
+    const table = document.querySelector('.grid');
+    if (!table) return;
     if (mode === 'collapsed') {
-        document.querySelectorAll('.project-row').forEach(row => row.classList.add('folded'));
-        document.querySelectorAll('.issue-row').forEach(row => row.classList.add('collapsed', 'folded'));
-        document.querySelectorAll('.log-row').forEach(row => row.classList.add('collapsed'));
+        table.querySelectorAll('.project-row').forEach(row => row.classList.add('folded'));
+        table.querySelectorAll('.issue-row').forEach(row => row.classList.add('collapsed', 'folded'));
+        table.querySelectorAll('.log-row').forEach(row => row.classList.add('collapsed'));
     } else if (mode === 'issues') {
-        document.querySelectorAll('.project-row').forEach(row => row.classList.remove('folded'));
-        document.querySelectorAll('.issue-row').forEach(row => {
+        table.querySelectorAll('.project-row').forEach(row => row.classList.remove('folded'));
+        table.querySelectorAll('.issue-row').forEach(row => {
             row.classList.remove('collapsed');
             row.classList.add('folded');
         });
-        document.querySelectorAll('.log-row').forEach(row => row.classList.add('collapsed'));
+        table.querySelectorAll('.log-row').forEach(row => row.classList.add('collapsed'));
     } else {
-        document.querySelectorAll('.project-row, .issue-row').forEach(row => row.classList.remove('folded'));
-        document.querySelectorAll('.issue-row, .log-row').forEach(row => row.classList.remove('collapsed'));
+        table.querySelectorAll('.project-row, .issue-row').forEach(row => row.classList.remove('folded'));
+        table.querySelectorAll('.issue-row, .log-row').forEach(row => row.classList.remove('collapsed'));
     }
 }
 

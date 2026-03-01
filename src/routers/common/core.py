@@ -7,10 +7,15 @@ from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.templating import Jinja2Templates
+from jinja2 import FileSystemBytecodeCache
 from services import ProjectService, IssueService, UserService, UserAttributeTypeService
 
 _BASE_DIR = Path(__file__).parent.parent.parent
 templates = Jinja2Templates(directory=_BASE_DIR / "templates")
+
+_jinja2_cache_dir = _BASE_DIR / "__pycache__" / "jinja2"
+_jinja2_cache_dir.mkdir(parents=True, exist_ok=True)
+templates.env.bytecode_cache = FileSystemBytecodeCache(str(_jinja2_cache_dir))
 
 
 # === フィルタークエリ生成 ===

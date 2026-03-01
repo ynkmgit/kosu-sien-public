@@ -6,7 +6,7 @@ from datetime import date
 from html import escape
 
 from services import WorkLogService
-from .renders import render_log_cell, render_progress_cell, render_row_label, render_user_cell, render_task_status_cell, render_issue_status_cell
+from .renders import render_log_cell, render_progress_cell, render_row_label, render_tag_badges, render_user_cell, render_task_status_cell, render_issue_status_cell
 from .dates import WEEKDAY_NAMES
 
 
@@ -24,50 +24,50 @@ def _get_date_cell_class(index: int, d: date, today: date, is_week: bool) -> str
 
 def _render_grid_header(dates: list[date], is_week: bool, today: date) -> str:
     """グリッドヘッダー行を生成"""
-    date_headers = ""
-    for i, d in enumerate(dates):
-        if is_week:
-            extra = _get_date_cell_class(i, d, today, is_week).replace("-cell", "-header")
-            date_headers += f'<th class="date-header weekday-header{extra}">{WEEKDAY_NAMES[i]}<br>{d.month}/{d.day}</th>'
-        else:
-            date_headers += f'<th class="date-header">{d.day}</th>'
+    date_headers = "".join(
+        f'<div class="gc date-header weekday-header{_get_date_cell_class(i, d, today, is_week).replace("-cell", "-header")}">'
+        f'{WEEKDAY_NAMES[i]}<br>{d.month}/{d.day}</div>'
+        if is_week else
+        f'<div class="gc date-header">{d.day}</div>'
+        for i, d in enumerate(dates)
+    )
 
     total_label = "週計" if is_week else "合計"
-    return f'''<tr>
-        <th class="row-header">作業</th>
-        <th class="user-header">担当</th>
-        <th class="status-header">状態</th>
-        <th class="progress-header">完了%</th>
+    return f'''<div class="grid-row grid-header">
+        <div class="gc gc-frozen row-header">作業</div>
+        <div class="gc user-header">担当</div>
+        <div class="gc status-header">状態</div>
+        <div class="gc progress-header">完了%</div>
         {date_headers}
-        <th class="total-header">{total_label}</th>
-    </tr>'''
+        <div class="gc total-header">{total_label}</div>
+    </div>'''
 
 
 def _render_project_row(row: dict, dates: list[date], project_totals: dict, is_week: bool, today: date) -> str:
     """プロジェクト集計行を生成"""
     pid = row['project_id']
 
-    cells = ""
-    for i, d in enumerate(dates):
-        val = project_totals[pid][d.isoformat()]
-        display = f"{val:.2f}" if val > 0 else "-"
-        extra = _get_date_cell_class(i, d, today, is_week)
-        cells += f'<td class="summary-cell{extra}">{display}</td>'
+    cells = "".join(
+        f'<div class="gc summary-cell numeric{_get_date_cell_class(i, d, today, is_week)}">'
+        f'{f"{val:.2f}" if val > 0 else "-"}</div>'
+        for i, d in enumerate(dates)
+        for val in [project_totals[pid][d.isoformat()]]
+    )
 
     total = project_totals[pid]["total"]
     total_display = f"{total:.2f}h" if total > 0 else "-"
 
     return (
-        f'<tr class="project-row" data-project-id="{pid}">'
-        f'<td class="project-name">'
+        f'<div class="grid-row project-row" data-project-id="{pid}">'
+        f'<div class="gc gc-frozen project-name">'
         f'<span class="toggle-icon" onclick="toggleProject({pid})">▼</span> {escape(row["project_name"])}'
-        f'</td>'
-        f'<td></td>'
-        f'<td></td>'
-        f'<td></td>'
+        f'</div>'
+        f'<div class="gc"></div>'
+        f'<div class="gc"></div>'
+        f'<div class="gc"></div>'
         f'{cells}'
-        f'<td class="row-total project-total">{total_display}</td>'
-        f'</tr>'
+        f'<div class="gc row-total numeric project-total">{total_display}</div>'
+        f'</div>'
     )
 
 
@@ -77,12 +77,12 @@ def _render_issue_row(row: dict, dates: list[date], issue_totals: dict, is_week:
     iid = row['issue_id']
     key = (pid, iid)
 
-    cells = ""
-    for i, d in enumerate(dates):
-        val = issue_totals[key][d.isoformat()]
-        display = f"{val:.2f}" if val > 0 else "-"
-        extra = _get_date_cell_class(i, d, today, is_week)
-        cells += f'<td class="summary-cell{extra}">{display}</td>'
+    cells = "".join(
+        f'<div class="gc summary-cell numeric{_get_date_cell_class(i, d, today, is_week)}">'
+        f'{f"{val:.2f}" if val > 0 else "-"}</div>'
+        for i, d in enumerate(dates)
+        for val in [issue_totals[key][d.isoformat()]]
+    )
 
     total = issue_totals[key]["total"]
     total_display = f"{total:.2f}h" if total > 0 else "-"
@@ -90,28 +90,17 @@ def _render_issue_row(row: dict, dates: list[date], issue_totals: dict, is_week:
     issue_status_cell = render_issue_status_cell(iid, row.get('issue_status', 'open'), status_labels or {})
 
     return (
-        f'<tr class="issue-row" data-project-id="{pid}" data-issue-id="{iid}">'
-        f'<td class="issue-name">'
+        f'<div class="grid-row issue-row" data-project-id="{pid}" data-issue-id="{iid}">'
+        f'<div class="gc gc-frozen issue-name">'
         f'<span class="toggle-icon" onclick="toggleIssue({pid}, {iid})">▼</span> {escape(row["issue_cd"])} {escape(row["issue_name"])}'
-        f'</td>'
-        f'<td></td>'
+        f'</div>'
+        f'<div class="gc"></div>'
         f'{issue_status_cell}'
-        f'<td></td>'
+        f'<div class="gc"></div>'
         f'{cells}'
-        f'<td class="row-total issue-total">{total_display}</td>'
-        f'</tr>'
+        f'<div class="gc row-total numeric issue-total">{total_display}</div>'
+        f'</div>'
     )
-
-
-def _render_tag_badges(tags: list[dict]) -> str:
-    """タグバッジHTML生成（グリッド用小サイズ）"""
-    if not tags:
-        return ""
-    badges = " ".join(
-        f'<span class="tag-badge tag-badge-sm" style="background:{escape(t["color"] or "#6b7280")}">{escape(t["name"])}</span>'
-        for t in tags
-    )
-    return f' <span class="row-tags">{badges}</span>'
 
 
 def _render_log_row(row: dict, dates: list[date], work_logs: dict, is_week: bool, today: date, task_tags: list[dict] = None, task_status_labels: dict = None) -> tuple[str, float, dict]:
@@ -138,39 +127,39 @@ def _render_log_row(row: dict, dates: list[date], work_logs: dict, is_week: bool
         cells.append(render_log_cell(row['task_id'], row['user_id'], date_str, hours, extra))
 
     row_total_display = f"{row_total:.2f}h" if row_total > 0 else "-"
-    tag_html = _render_tag_badges(task_tags or [])
+    tag_html = render_tag_badges(task_tags or [])
     status_cell = render_task_status_cell(row['task_id'], row.get('task_status', 'open'), task_status_labels or {})
 
     html = (
-        f'<tr class="log-row" data-project-id="{pid}" data-issue-id="{iid}">'
-        f'<td class="row-label">{render_row_label(row["task_name"])}{tag_html}</td>'
+        f'<div class="grid-row log-row" data-project-id="{pid}" data-issue-id="{iid}">'
+        f'<div class="gc gc-frozen row-label">{render_row_label(row["task_name"])}{tag_html}</div>'
         f'{render_user_cell(row["user_name"])}'
         f'{status_cell}'
         f'{render_progress_cell(row["assignee_id"], row["progress_rate"])}'
         f'{"".join(cells)}'
-        f'<td class="row-total">{row_total_display}</td>'
-        f'</tr>'
+        f'<div class="gc row-total numeric">{row_total_display}</div>'
+        f'</div>'
     )
     return html, row_total, date_hours
 
 
 def _render_total_row(dates: list[date], date_totals: dict, grand_total: float, is_week: bool, today: date) -> str:
     """列合計行を生成"""
-    cells = ""
-    for i, d in enumerate(dates):
-        val = date_totals[d.isoformat()]
-        display = f"{val:.2f}" if val > 0 else "-"
-        extra = _get_date_cell_class(i, d, today, is_week)
-        cells += f'<td class="col-total{extra}">{display}</td>'
+    cells = "".join(
+        f'<div class="gc col-total numeric{_get_date_cell_class(i, d, today, is_week)}">'
+        f'{f"{val:.2f}" if val > 0 else "-"}</div>'
+        for i, d in enumerate(dates)
+        for val in [date_totals[d.isoformat()]]
+    )
 
-    return f'''<tr class="total-row">
-        <td class="total-label">日計</td>
-        <td></td>
-        <td></td>
-        <td></td>
+    return f'''<div class="grid-row total-row">
+        <div class="gc gc-frozen total-label">日計</div>
+        <div class="gc"></div>
+        <div class="gc"></div>
+        <div class="gc"></div>
         {cells}
-        <td class="grand-total">{grand_total:.2f}h</td>
-    </tr>'''
+        <div class="gc grand-total numeric">{grand_total:.2f}h</div>
+    </div>'''
 
 
 def render_grid(dates: list[date], rows, work_logs, view: str = "week", tags_map: dict = None,
@@ -238,5 +227,8 @@ def render_grid(dates: list[date], rows, work_logs, view: str = "week", tags_map
     total_row = _render_total_row(dates, date_totals, grand_total, is_week, today)
     html_rows.insert(0, total_row)
 
-    table_class = "log-table week-table" if is_week else "log-table"
-    return f'{bulk_actions}<table class="{table_class}"><thead>{header}</thead><tbody>{"".join(html_rows)}</tbody></table>'
+    num_dates = len(dates)
+    col_width = "70px" if is_week else "55px"
+    grid_cols = f"minmax(180px, 1fr) 120px 80px 70px repeat({num_dates}, {col_width}) 65px"
+    week_class = " week-table" if is_week else ""
+    return f'{bulk_actions}<div class="grid{week_class}" style="--grid-cols: {grid_cols}">{header}{"".join(html_rows)}</div>'

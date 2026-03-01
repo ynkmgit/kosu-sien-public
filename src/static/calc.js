@@ -15,53 +15,120 @@ function safeParseFloat(value) {
 }
 
 /**
- * 実績入力（週表示）の計算列を更新
+ * 実績入力グリッドのデータモデル
+ * DOM読み取りを排除し、JS変数で集計計算を行う
+ */
+const workLogModel = {
+    rows: {},       // { "taskId-userId": { "2026-02-01": 4.0, ... } }
+    rowKeys: [],    // ["taskId-userId", ...] — 行の順序を保持
+    dateKeys: [],   // ["2026-02-01", "2026-02-02", ...]
+    initialized: false,
+
+    init(table) {
+        this.rows = {};
+        this.rowKeys = [];
+        this.dateKeys = [];
+        const dateSet = new Set();
+
+        table.querySelectorAll('.log-row').forEach(row => {
+            const cells = row.querySelectorAll('.log-cell');
+            if (cells.length === 0) return;
+
+            const key = `${cells[0].dataset.taskId}-${cells[0].dataset.userId}`;
+            if (!this.rows[key]) {
+                this.rows[key] = {};
+                this.rowKeys.push(key);
+            }
+
+            cells.forEach(cell => {
+                const date = cell.dataset.date;
+                if (!dateSet.has(date)) {
+                    dateSet.add(date);
+                    this.dateKeys.push(date);
+                }
+                // click-to-edit: inputがあればinput.value、なければtdのテキスト
+                const input = cell.querySelector('.log-input');
+                this.rows[key][date] = input
+                    ? safeParseFloat(input.value)
+                    : safeParseFloat(cell.textContent);
+            });
+        });
+        this.initialized = true;
+    },
+
+    update(taskId, userId, date, value) {
+        const key = `${taskId}-${userId}`;
+        if (!this.rows[key]) this.rows[key] = {};
+        this.rows[key][date] = value;
+    },
+
+    getRowTotal(key) {
+        const row = this.rows[key];
+        if (!row) return 0;
+        let total = 0;
+        for (const d of this.dateKeys) total += row[d] || 0;
+        return total;
+    },
+
+    getColTotal(date) {
+        let total = 0;
+        for (const key of this.rowKeys) {
+            total += (this.rows[key][date] || 0);
+        }
+        return total;
+    },
+
+    getGrandTotal() {
+        let total = 0;
+        for (const key of this.rowKeys) {
+            for (const d of this.dateKeys) {
+                total += (this.rows[key][d] || 0);
+            }
+        }
+        return total;
+    }
+};
+
+/**
+ * 実績入力の計算列を更新（データモデル方式）
+ * 初回のみDOMから値を読み取ってモデルを構築。以降はモデルから集計しDOMに書き込むのみ。
  */
 function updateWorkLogsCalculation() {
-    const table = document.querySelector('.log-table, .week-table');
-    if (!table) return;
+    const table = document.querySelector('.grid');
+    if (!table || table.querySelector('.task-row')) return;  // アサイン管理は別関数
 
-    // 日計の初期化
-    const dateColumns = {};
-    table.querySelectorAll('.date-header').forEach((header, index) => {
-        dateColumns[index] = 0;
-    });
+    if (!workLogModel.initialized) {
+        workLogModel.init(table);
+    }
+
+    const fmtH = (v) => v > 0 ? `${v.toFixed(2)}h` : '-';
+    const fmt = (v) => v > 0 ? v.toFixed(2) : '-';
 
     let grandTotal = 0;
 
-    // 各作業行を処理
+    // 行合計の更新（DOM書き込みのみ）
     table.querySelectorAll('.log-row').forEach(row => {
-        let rowTotal = 0;
+        const firstCell = row.querySelector('.log-cell');
+        if (!firstCell) return;
+        const key = `${firstCell.dataset.taskId}-${firstCell.dataset.userId}`;
+        const rowTotal = workLogModel.getRowTotal(key);
 
-        // 各セルの値を集計
-        row.querySelectorAll('.log-input').forEach((input, index) => {
-            const value = safeParseFloat(input.value);
-            rowTotal += value;
-            dateColumns[index] = (dateColumns[index] || 0) + value;
-        });
-
-        // 行合計を更新
         const rowTotalCell = row.querySelector('.row-total');
-        if (rowTotalCell) {
-            rowTotalCell.textContent = rowTotal > 0 ? `${rowTotal.toFixed(2)}h` : '-';
-        }
+        if (rowTotalCell) rowTotalCell.textContent = fmtH(rowTotal);
 
         grandTotal += rowTotal;
     });
 
-    // 列合計（日計）を更新
+    // 列合計の更新
     const totalRow = table.querySelector('.total-row');
     if (totalRow) {
         totalRow.querySelectorAll('.col-total').forEach((cell, index) => {
-            const value = dateColumns[index] || 0;
-            cell.textContent = value > 0 ? value.toFixed(2) : '-';
+            const date = workLogModel.dateKeys[index];
+            cell.textContent = fmt(date ? workLogModel.getColTotal(date) : 0);
         });
 
-        // 総合計を更新
         const grandTotalCell = totalRow.querySelector('.grand-total');
-        if (grandTotalCell) {
-            grandTotalCell.textContent = `${grandTotal.toFixed(2)}h`;
-        }
+        if (grandTotalCell) grandTotalCell.textContent = fmtH(grandTotal);
     }
 }
 
@@ -164,14 +231,22 @@ function updateMonthlyAssignmentCalculation() {
  * 月別集計（案件行・PJ行）もリアルタイム更新する
  */
 function updateAssignmentGridCalculation() {
-    const table = document.querySelector('.log-table');
+    const table = document.querySelector('.grid');
     if (!table || !table.querySelector('.task-row')) return;
 
-    const monthCount = table.querySelectorAll('thead .date-header').length;
+    const monthCount = table.querySelectorAll('.grid-header .date-header').length;
     if (monthCount === 0) return;
 
     const fmtH = (v) => v > 0 ? `${v.toFixed(2)}h` : '-';
     const fmtMonth = (v) => v > 0 ? v.toFixed(2) : '-';
+
+    // サブ行をタスクIDでグループ化（1回のDOM走査で完了）
+    const subRowsByTask = {};
+    table.querySelectorAll('.assignee-sub-row').forEach(row => {
+        const tid = row.dataset.taskId;
+        if (!subRowsByTask[tid]) subRowsByTask[tid] = [];
+        subRowsByTask[tid].push(row);
+    });
 
     // 案件・PJ集計用
     const issueAcc = {};
@@ -185,9 +260,10 @@ function updateAssignmentGridCalculation() {
         if (!issueAcc[iid]) issueAcc[iid] = { pid, est: 0, act: 0, planTotal: 0, ar: null, ua: null, months: new Array(monthCount).fill(0) };
         if (!projAcc[pid]) projAcc[pid] = { est: 0, act: 0, planTotal: 0, ar: null, ua: null, months: new Array(monthCount).fill(0) };
 
-        // 見積
-        const estInput = taskRow.querySelector('.estimate-input');
-        const est = estInput ? safeParseFloat(estInput.value) : 0;
+        // 見積 — click-to-edit対応: inputがあればinput.value、なければcellのdata-value
+        const estCell = taskRow.querySelector('.estimate-cell');
+        const estInput = estCell ? estCell.querySelector('.estimate-input') : null;
+        const est = estInput ? safeParseFloat(estInput.value) : (estCell ? safeParseFloat(estCell.dataset.value) : 0);
 
         // 実績（表示のみ）
         const actCell = taskRow.querySelector('.actual-cell');
@@ -199,21 +275,25 @@ function updateAssignmentGridCalculation() {
         if (remCell) {
             if (est === 0 && act === 0) {
                 remCell.textContent = '-';
-                remCell.className = 'remaining-cell';
+                remCell.toggleAttribute('data-negative', false);
             } else {
                 remCell.textContent = `${remaining.toFixed(2)}h`;
-                remCell.className = remaining < 0 ? 'remaining-cell remaining-negative' : 'remaining-cell';
+                remCell.toggleAttribute('data-negative', remaining < 0);
             }
         }
 
         // 山積計・月別集計
-        const subRows = [...table.querySelectorAll(`.assignee-sub-row[data-task-id="${tid}"]`)];
+        const subRows = subRowsByTask[tid] || [];
         let taskPlanTotal = 0;
         const taskMonths = new Array(monthCount).fill(0);
         const progressData = [];
 
         if (subRows.length > 0) {
-            // マルチ担当: サブ行から集計
+            // マルチ担当: サブ行から集計 + タスク行のorphan plan
+            const taskPTCell = taskRow.querySelector('.plan-total-summary');
+            const taskHiddenPlan = taskPTCell ? safeParseFloat(taskPTCell.dataset.hiddenPlan) : 0;
+            taskPlanTotal = taskHiddenPlan;
+
             subRows.forEach(subRow => {
                 let subVisiblePlan = 0;
                 subRow.querySelectorAll('.plan-input').forEach((input, idx) => {
@@ -230,18 +310,21 @@ function updateAssignmentGridCalculation() {
                 // サブ行の山積計を更新
                 if (subPTCell) subPTCell.textContent = fmtH(subPlanTotal);
 
-                // 完了%データ収集（加重平均用）
-                const progInput = subRow.querySelector('.progress-input');
-                if (progInput && progInput.value !== '') {
-                    progressData.push({ progress: safeParseFloat(progInput.value), planTotal: subPlanTotal });
+                // 完了%データ収集（加重平均用）— click-to-edit対応
+                const progCell = subRow.querySelector('.progress-cell');
+                const progInput = progCell ? progCell.querySelector('.progress-input') : null;
+                const progValue = progInput ? progInput.value : (progCell ? progCell.dataset.value : '');
+                if (progValue !== '' && progValue !== undefined) {
+                    progressData.push({ progress: safeParseFloat(progValue), planTotal: subPlanTotal });
                 }
             });
 
             // タスク行の月別集計セルを更新
-            const allTds = [...taskRow.querySelectorAll('td')];
-            allTds.slice(-monthCount).forEach((td, idx) => {
-                td.textContent = fmtMonth(taskMonths[idx]);
-            });
+            const gcs = taskRow.querySelectorAll('.gc');
+            const start = gcs.length - monthCount;
+            for (let idx = 0; idx < monthCount; idx++) {
+                gcs[start + idx].textContent = fmtMonth(taskMonths[idx]);
+            }
         } else {
             // 単一担当 or 未割当: タスク行のplan-inputから集計
             let visiblePlan = 0;
@@ -274,12 +357,15 @@ function updateAssignmentGridCalculation() {
             const progCell = taskRow.querySelector('.progress-cell');
             if (progCell && !progCell.querySelector('.progress-input')) {
                 progCell.textContent = progress !== null ? `${progress}%` : '';
-                progCell.className = progress !== null ? 'progress-cell weighted-progress' : 'progress-cell';
+                progCell.toggleAttribute('data-weighted', progress !== null);
             }
         } else {
-            const progInput = taskRow.querySelector('.progress-input');
-            if (progInput && progInput.value !== '') {
-                progress = safeParseFloat(progInput.value);
+            // click-to-edit対応: inputがあればinput.value、なければcellのdata-value
+            const progCell = taskRow.querySelector('.progress-cell');
+            const progInput = progCell ? progCell.querySelector('.progress-input') : null;
+            const progValue = progInput ? progInput.value : (progCell ? progCell.dataset.value : '');
+            if (progValue !== '' && progValue !== undefined) {
+                progress = safeParseFloat(progValue);
             }
         }
 
@@ -296,7 +382,7 @@ function updateAssignmentGridCalculation() {
         const sdCell = taskRow.querySelector('.schedule-diff-cell');
         if (sdCell) {
             sdCell.textContent = `${sd.toFixed(2)}h`;
-            sdCell.className = sd < 0 ? 'schedule-diff-cell schedule-diff-negative' : 'schedule-diff-cell';
+            sdCell.toggleAttribute('data-negative', sd < 0);
         }
 
         // 未割当 = 実際残 − 山積計
@@ -306,10 +392,10 @@ function updateAssignmentGridCalculation() {
         if (uaCell) {
             if (ua !== null) {
                 uaCell.textContent = `${ua.toFixed(2)}h`;
-                uaCell.className = ua < 0 ? 'unallocated-cell unallocated-negative' : 'unallocated-cell';
+                uaCell.toggleAttribute('data-negative', ua < 0);
             } else {
                 uaCell.textContent = '-';
-                uaCell.className = 'unallocated-cell';
+                uaCell.toggleAttribute('data-negative', false);
             }
         }
 
@@ -358,10 +444,10 @@ function _updateAggRow(row, a, monthCount) {
     if (remCell) {
         if (a.est === 0 && a.act === 0) {
             remCell.textContent = '-';
-            remCell.className = 'summary-cell remaining-summary';
+            remCell.toggleAttribute('data-negative', false);
         } else {
             remCell.textContent = `${rem.toFixed(2)}h`;
-            remCell.className = rem < 0 ? 'summary-cell remaining-summary remaining-negative' : 'summary-cell remaining-summary';
+            remCell.toggleAttribute('data-negative', rem < 0);
         }
     }
 
@@ -372,7 +458,7 @@ function _updateAggRow(row, a, monthCount) {
     const sdCell = row.querySelector('.schedule-diff-summary');
     if (sdCell) {
         sdCell.textContent = `${sd.toFixed(2)}h`;
-        sdCell.className = sd < 0 ? 'summary-cell schedule-diff-summary schedule-diff-negative' : 'summary-cell schedule-diff-summary';
+        sdCell.toggleAttribute('data-negative', sd < 0);
     }
 
     const ptCell = row.querySelector('.plan-total-summary');
@@ -382,17 +468,18 @@ function _updateAggRow(row, a, monthCount) {
     if (uaCell) {
         if (a.ua !== null) {
             uaCell.textContent = `${a.ua.toFixed(2)}h`;
-            uaCell.className = a.ua < 0 ? 'summary-cell unallocated-summary unallocated-negative' : 'summary-cell unallocated-summary';
+            uaCell.toggleAttribute('data-negative', a.ua < 0);
         } else {
             uaCell.textContent = '-';
-            uaCell.className = 'summary-cell unallocated-summary';
+            uaCell.toggleAttribute('data-negative', false);
         }
     }
 
-    const allTds = [...row.querySelectorAll('td')];
-    allTds.slice(-monthCount).forEach((td, idx) => {
-        td.textContent = fmtMonth(a.months[idx]);
-    });
+    const gcs = row.querySelectorAll('.gc');
+    const start = gcs.length - monthCount;
+    for (let idx = 0; idx < monthCount; idx++) {
+        gcs[start + idx].textContent = fmtMonth(a.months[idx]);
+    }
 }
 
 /**
@@ -400,7 +487,7 @@ function _updateAggRow(row, a, monthCount) {
  */
 function recalculateAll() {
     // 実績入力
-    if (document.querySelector('.log-table, .week-table')) {
+    if (document.querySelector('.grid')) {
         updateWorkLogsCalculation();
     }
 
@@ -421,11 +508,401 @@ function recalculateAll() {
 /**
  * イベントリスナーの設定
  */
+let _recalcTimer = null;
+function _debouncedRecalc() {
+    if (_recalcTimer) return;
+    _recalcTimer = requestAnimationFrame(() => {
+        _recalcTimer = null;
+        recalculateAll();
+    });
+}
+
+/**
+ * click-to-edit: log-cellをアクティブ化（input生成）
+ */
+function _activateLogCell(cell) {
+    const currentValue = cell.textContent.trim();
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'log-input';
+    input.step = '0.25';
+    input.min = '0.25';
+    input.value = currentValue;
+    input.dataset.taskId = cell.dataset.taskId;
+    input.dataset.userId = cell.dataset.userId;
+    input.dataset.date = cell.dataset.date;
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+
+    // blur時にセルを非アクティブ化
+    input.addEventListener('blur', () => {
+        _deactivateLogCell(cell, input);
+    });
+
+    // キーボードナビゲーション
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            // 元の値に戻す
+            input.value = currentValue;
+            input.blur();
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            const nextCell = e.shiftKey
+                ? _findAdjacentLogCell(cell, -1)
+                : _findAdjacentLogCell(cell, 1);
+            input.blur();
+            if (nextCell) _activateLogCell(nextCell);
+        }
+    });
+}
+
+/**
+ * click-to-edit: log-cellを非アクティブ化（inputからテキストに戻す）
+ */
+function _deactivateLogCell(cell, input) {
+    const newValue = safeParseFloat(input.value);
+    const oldValue = workLogModel.rows[`${input.dataset.taskId}-${input.dataset.userId}`]?.[input.dataset.date] || 0;
+    const display = newValue > 0 ? newValue.toFixed(2) : '';
+
+    cell.removeChild(input);
+    cell.textContent = display;
+
+    // 値が変わった場合のみモデル更新とサーバー保存
+    if (newValue !== oldValue) {
+        workLogModel.update(input.dataset.taskId, input.dataset.userId, input.dataset.date, newValue);
+        _sendJSON('POST', '/work-logs', {
+            task_id: input.dataset.taskId, user_id: input.dataset.userId,
+            work_date: input.dataset.date, hours: input.value || 0
+        }, cell);
+        _debouncedRecalc();
+    }
+}
+
+/**
+ * click-to-edit: 隣接するlog-cellを探す
+ * @param {HTMLElement} cell - 現在のセル
+ * @param {number} direction - 1=次, -1=前
+ */
+function _findAdjacentLogCell(cell, direction) {
+    const row = cell.closest('.grid-row');
+    const cells = Array.from(row.querySelectorAll('.log-cell'));
+    const index = cells.indexOf(cell);
+    const nextIndex = index + direction;
+
+    if (nextIndex >= 0 && nextIndex < cells.length) {
+        return cells[nextIndex];
+    }
+
+    // 行をまたぐ
+    const rows = Array.from(row.closest('.grid').querySelectorAll('.log-row'));
+    const rowIndex = rows.indexOf(row);
+    const nextRow = rows[rowIndex + direction];
+    if (nextRow) {
+        const nextCells = nextRow.querySelectorAll('.log-cell');
+        return direction > 0 ? nextCells[0] : nextCells[nextCells.length - 1];
+    }
+    return null;
+}
+
+/**
+ * click-to-edit: status-cellをアクティブ化（select生成）
+ */
+function _activateStatusCell(cell) {
+    const labels = JSON.parse(cell.dataset.labels);
+    const current = cell.dataset.status;
+    const action = cell.dataset.action;
+
+    const select = document.createElement('select');
+    select.className = `grid-status-select status-${current}`;
+
+    // data属性をコピー
+    if (cell.dataset.taskId) select.dataset.taskId = cell.dataset.taskId;
+    if (cell.dataset.issueId) select.dataset.issueId = cell.dataset.issueId;
+    select.dataset.action = action;
+
+    for (const [value, label] of Object.entries(labels)) {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        if (value === current) opt.selected = true;
+        select.appendChild(opt);
+    }
+
+    cell.textContent = '';
+    cell.appendChild(select);
+    select.focus();
+
+    let deactivated = false;
+    const deactivate = () => {
+        if (deactivated) return;
+        deactivated = true;
+        _deactivateStatusCell(cell, select);
+    };
+
+    select.addEventListener('change', () => {
+        const newStatus = select.value;
+        // サーバー保存
+        if (action === 'task-status') {
+            _sendJSON('PUT', `/tasks/${cell.dataset.taskId}/status`, { status: newStatus }, cell);
+        } else if (action === 'issue-status') {
+            _sendJSON('PUT', `/work-logs/issue-status/${cell.dataset.issueId}`, { status: newStatus }, cell);
+        }
+        cell.dataset.status = newStatus;
+        deactivate();
+    });
+
+    select.addEventListener('blur', deactivate);
+
+    select.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            deactivate();
+        }
+    });
+}
+
+/**
+ * click-to-edit: status-cellを非アクティブ化
+ */
+function _deactivateStatusCell(cell, select) {
+    const status = cell.dataset.status;
+    const labels = JSON.parse(cell.dataset.labels);
+    cell.removeChild(select);
+    cell.textContent = labels[status] || status;
+    // セルのステータスクラスを更新
+    cell.className = cell.className.replace(/\bstatus-\S+/g, '');
+    cell.classList.add('gc', 'status-cell', `status-${status}`);
+}
+
+/**
+ * click-to-edit: progress-cellをアクティブ化（input生成）
+ */
+function _activateProgressCell(cell) {
+    const currentValue = cell.dataset.value || '';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'progress-input';
+    input.step = '1';
+    input.min = '0';
+    input.max = '100';
+    input.value = currentValue;
+    input.placeholder = '-';
+    input.dataset.assigneeId = cell.dataset.assigneeId;
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+
+    input.addEventListener('blur', () => {
+        _deactivateProgressCell(cell, input);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            input.value = currentValue;
+            input.blur();
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+        }
+    });
+}
+
+/**
+ * click-to-edit: progress-cellを非アクティブ化
+ */
+function _deactivateProgressCell(cell, input) {
+    const newValue = input.value.trim();
+    const oldValue = cell.dataset.value || '';
+    const display = newValue !== '' ? `${newValue}%` : '';
+
+    cell.removeChild(input);
+    cell.textContent = display;
+    cell.dataset.value = newValue;
+
+    if (newValue !== oldValue) {
+        _sendJSON('PUT', `/assignments/assignees/${input.dataset.assigneeId}/progress`, {
+            progress_rate: newValue
+        }, cell);
+        _debouncedRecalc();
+    }
+}
+
+/**
+ * click-to-edit: estimate-cellをアクティブ化（input生成）
+ */
+function _activateEstimateCell(cell) {
+    const currentValue = cell.dataset.value || '';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'estimate-input';
+    input.step = '0.25';
+    input.min = '0';
+    input.value = currentValue;
+    input.dataset.taskId = cell.dataset.taskId;
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+
+    input.addEventListener('blur', () => {
+        _deactivateEstimateCell(cell, input);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            input.value = currentValue;
+            input.blur();
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+        }
+    });
+}
+
+/**
+ * click-to-edit: estimate-cellを非アクティブ化
+ */
+function _deactivateEstimateCell(cell, input) {
+    const newValue = input.value.trim();
+    const oldValue = cell.dataset.value || '';
+    const display = newValue && parseFloat(newValue) > 0 ? parseFloat(newValue).toFixed(2) : '';
+
+    cell.removeChild(input);
+    cell.textContent = display;
+    cell.dataset.value = display;
+
+    if (newValue !== oldValue) {
+        _sendJSON('PUT', `/tasks/${input.dataset.taskId}/estimate`, {
+            estimate_hours: newValue || 0
+        }, cell);
+        _debouncedRecalc();
+    }
+}
+
+function _sendJSON(method, url, data, triggerEl) {
+    const body = new URLSearchParams(data);
+    if (triggerEl) triggerEl.classList.add('saving');
+    return fetch(url, { method, body })
+        .then(res => {
+            if (triggerEl) triggerEl.classList.remove('saving');
+            if (!res.ok) throw new Error(res.status);
+            if (triggerEl) {
+                triggerEl.classList.add('saved');
+                setTimeout(() => triggerEl.classList.remove('saved'), 1500);
+            }
+        })
+        .catch(() => {
+            if (triggerEl) {
+                triggerEl.classList.remove('saving');
+                triggerEl.classList.add('error');
+            }
+        });
+}
+
+function _initGridDelegation() {
+    document.addEventListener('change', (e) => {
+        const t = e.target;
+        t.classList.remove('error');
+
+        // 工数入力 / 進捗率 / ステータス / 見積 — click-to-editのblurで処理するためchangeは不要
+
+        // 月次計画 (.plan-input)
+        if (t.matches('.plan-input')) {
+            _sendJSON('POST', '/assignments/plans', {
+                task_id: t.dataset.taskId, user_id: t.dataset.userId,
+                year_month: t.dataset.yearMonth, planned_hours: t.value || 0
+            }, t);
+            return;
+        }
+
+        // 月次アサイン (.assign-input)
+        if (t.matches('.assign-input')) {
+            _sendJSON('POST', '/monthly-assignments', {
+                user_id: t.dataset.userId, project_id: t.dataset.projectId,
+                year_month: t.dataset.yearMonth, hours: t.value || 0
+            }, t);
+            return;
+        }
+    });
+}
+
 function initCalculation() {
-    // 入力時にリアルタイム計算
+    // グリッド入力のイベントデリゲーション
+    _initGridDelegation();
+
+    // click-to-edit: セルクリックで入力要素を動的生成
+    document.addEventListener('click', (e) => {
+        const cell = e.target.closest('.log-cell');
+        if (cell && !cell.querySelector('.log-input')) {
+            _activateLogCell(cell);
+            return;
+        }
+
+        // status-cell click-to-edit
+        const statusCell = e.target.closest('.status-cell');
+        if (statusCell && !statusCell.querySelector('select') && statusCell.dataset.labels) {
+            _activateStatusCell(statusCell);
+            return;
+        }
+
+        // progress-cell click-to-edit（加重平均表示のdata-weightedは除外）
+        const progressCell = e.target.closest('.progress-cell');
+        if (progressCell && !progressCell.querySelector('.progress-input')
+            && progressCell.dataset.assigneeId && !progressCell.hasAttribute('data-weighted')) {
+            _activateProgressCell(progressCell);
+            return;
+        }
+
+        // estimate-cell click-to-edit
+        const estimateCell = e.target.closest('.estimate-cell');
+        if (estimateCell && !estimateCell.querySelector('.estimate-input') && estimateCell.dataset.taskId) {
+            _activateEstimateCell(estimateCell);
+            return;
+        }
+
+        // 空plan-cellクリックでinput動的生成
+        const planCell = e.target.closest('.plan-cell-empty');
+        if (planCell) {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'plan-input';
+            input.step = '0.25';
+            input.min = '0';
+            input.dataset.taskId = planCell.dataset.taskId;
+            input.dataset.userId = planCell.dataset.userId;
+            input.dataset.yearMonth = planCell.dataset.yearMonth;
+
+            planCell.classList.remove('plan-cell-empty');
+            planCell.textContent = '';
+            planCell.appendChild(input);
+            input.focus();
+        }
+    });
+
+    // 入力時にリアルタイム計算（デバウンス付き）
     document.addEventListener('input', (e) => {
-        if (e.target.matches('.log-input, .assign-input, .plan-input, .estimate-input, .progress-input, input[name="hours"]')) {
-            recalculateAll();
+        const t = e.target;
+        if (t.matches('.log-input')) {
+            workLogModel.update(t.dataset.taskId, t.dataset.userId, t.dataset.date, safeParseFloat(t.value));
+        }
+        if (t.matches('.log-input, .assign-input, .plan-input, .estimate-input, .progress-input, input[name="hours"]')) {
+            _debouncedRecalc();
         }
     });
 
@@ -445,18 +922,14 @@ function initCalculation() {
         }
     });
 
-    // HTMX リクエスト完了後にも計算（サーバー側の値と同期）
-    document.addEventListener('htmx:afterRequest', (e) => {
-        if (e.detail.successful) {
-            recalculateAll();
-        }
-    });
-
     // 初期表示時に計算
     document.addEventListener('DOMContentLoaded', recalculateAll);
 
-    // HTMXの動的コンテンツ読み込み後に計算
-    document.addEventListener('htmx:afterSettle', recalculateAll);
+    // HTMXの動的コンテンツ読み込み後にモデルリセット＋再計算
+    document.addEventListener('htmx:afterSettle', () => {
+        workLogModel.initialized = false;
+        _debouncedRecalc();
+    });
 }
 
 // 初期化実行

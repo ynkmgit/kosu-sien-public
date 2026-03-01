@@ -10,7 +10,11 @@ function getCurrentFold() {
     return new URL(window.location.href).searchParams.get('fold') || '';
 }
 
-function buildUrl(users, projects, issues, tags, issueStatuses, taskStatuses, excludeDoneIssue, excludeDoneTask, fold) {
+function getCurrentBaseMonth() {
+    return new URL(window.location.href).searchParams.get('base_month') || '';
+}
+
+function buildUrl(users, projects, issues, tags, issueStatuses, taskStatuses, excludeDoneIssue, excludeDoneTask, fold, baseMonth) {
     const params = new URLSearchParams();
     users.forEach(u => params.append('user', u));
     projects.forEach(p => params.append('project', p));
@@ -22,6 +26,8 @@ function buildUrl(users, projects, issues, tags, issueStatuses, taskStatuses, ex
     if (excludeDoneTask) params.set('exclude_done_task', 'true');
     const f = fold !== undefined ? fold : getCurrentFold();
     if (f) params.set('fold', f);
+    const bm = baseMonth !== undefined ? baseMonth : getCurrentBaseMonth();
+    if (bm) params.set('base_month', bm);
     return '/assignments?' + params.toString();
 }
 
@@ -36,13 +42,15 @@ function getCurrentFilters() {
         taskStatuses: url.searchParams.getAll('task_status').map(Number),
         excludeDoneIssue: url.searchParams.get('exclude_done_issue') === 'true',
         excludeDoneTask: url.searchParams.get('exclude_done_task') === 'true',
+        baseMonth: url.searchParams.get('base_month') || '',
     };
 }
 
 function _navigateWithFilters(f) {
     window.location.href = buildUrl(
         f.users, f.projects, f.issues, f.tags,
-        f.issueStatuses, f.taskStatuses, f.excludeDoneIssue, f.excludeDoneTask
+        f.issueStatuses, f.taskStatuses, f.excludeDoneIssue, f.excludeDoneTask,
+        undefined, f.baseMonth
     );
 }
 
@@ -76,6 +84,14 @@ function removeFilter(type, id) {
     else if (type === 'tag') removeFrom(f.tags);
     else if (type === 'issue_status') removeFrom(f.issueStatuses);
     else if (type === 'task_status') removeFrom(f.taskStatuses);
+    _navigateWithFilters(f);
+}
+
+// === 基準月ナビゲーション ===
+
+function changeBaseMonth(ym) {
+    const f = getCurrentFilters();
+    f.baseMonth = ym;
     _navigateWithFilters(f);
 }
 
@@ -167,33 +183,35 @@ function toggleTask(projectId, issueId, taskId) {
 }
 
 function applyFold(mode) {
+    const table = document.querySelector('.grid');
+    if (!table) return;
     if (mode === 'collapsed') {
-        document.querySelectorAll('.project-row').forEach(row => row.classList.add('folded'));
-        document.querySelectorAll('.issue-row').forEach(row => row.classList.add('collapsed', 'folded'));
-        document.querySelectorAll('.task-row').forEach(row => row.classList.add('collapsed', 'folded'));
-        document.querySelectorAll('.assignee-sub-row').forEach(row => row.classList.add('collapsed'));
+        table.querySelectorAll('.project-row').forEach(row => row.classList.add('folded'));
+        table.querySelectorAll('.issue-row').forEach(row => row.classList.add('collapsed', 'folded'));
+        table.querySelectorAll('.task-row').forEach(row => row.classList.add('collapsed', 'folded'));
+        table.querySelectorAll('.assignee-sub-row').forEach(row => row.classList.add('collapsed'));
     } else if (mode === 'issues') {
-        document.querySelectorAll('.project-row').forEach(row => row.classList.remove('folded'));
-        document.querySelectorAll('.issue-row').forEach(row => {
+        table.querySelectorAll('.project-row').forEach(row => row.classList.remove('folded'));
+        table.querySelectorAll('.issue-row').forEach(row => {
             row.classList.remove('collapsed');
             row.classList.add('folded');
         });
-        document.querySelectorAll('.task-row, .assignee-sub-row').forEach(row => row.classList.add('collapsed'));
+        table.querySelectorAll('.task-row, .assignee-sub-row').forEach(row => row.classList.add('collapsed'));
     } else if (mode === 'tasks') {
-        document.querySelectorAll('.project-row').forEach(row => row.classList.remove('folded'));
-        document.querySelectorAll('.issue-row').forEach(row => {
+        table.querySelectorAll('.project-row').forEach(row => row.classList.remove('folded'));
+        table.querySelectorAll('.issue-row').forEach(row => {
             row.classList.remove('collapsed');
             row.classList.remove('folded');
         });
-        document.querySelectorAll('.task-row').forEach(row => {
+        table.querySelectorAll('.task-row').forEach(row => {
             row.classList.remove('collapsed');
             row.classList.add('folded');
         });
-        document.querySelectorAll('.assignee-sub-row').forEach(row => row.classList.add('collapsed'));
+        table.querySelectorAll('.assignee-sub-row').forEach(row => row.classList.add('collapsed'));
     } else {
         // expandAll
-        document.querySelectorAll('.project-row, .issue-row, .task-row').forEach(row => row.classList.remove('folded'));
-        document.querySelectorAll('.issue-row, .task-row, .assignee-sub-row').forEach(row => row.classList.remove('collapsed'));
+        table.querySelectorAll('.project-row, .issue-row, .task-row').forEach(row => row.classList.remove('folded'));
+        table.querySelectorAll('.issue-row, .task-row, .assignee-sub-row').forEach(row => row.classList.remove('collapsed'));
     }
 }
 
@@ -227,82 +245,36 @@ function collapseToTasks() {
     setFoldUrl('tasks');
 }
 
-// === 担当者操作（DOM操作中心） ===
+// === 担当者操作（サーバーサイド HTML 生成方式） ===
 
 let _assigneeTimeout = null;
 
-function _getMonths() {
-    const headerRow = document.querySelector('.log-table thead tr');
-    if (!headerRow) return [];
-    return Array.from(headerRow.querySelectorAll('.date-header')).map(th => th.dataset.yearMonth);
-}
+/**
+ * タスクブロック（task-row + サブ行群）をサーバーから取得した HTML で置換する
+ */
+function _replaceTaskBlock(taskId, html) {
+    // 既存の task-row + サブ行を全削除
+    const oldTaskRow = document.querySelector(`.task-row[data-task-id="${taskId}"]`);
+    if (!oldTaskRow) return;
+    document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"]`).forEach(r => r.remove());
 
-function _getMonthCellCount() {
-    return _getMonths().length || 7;
-}
+    // サーバーから返された HTML を挿入
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const newElements = template.content.children;
 
-function _escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function _planCellsHtml(taskId, userId) {
-    const months = _getMonths();
-    return months.map(ym =>
-        `<td class="plan-cell"><input type="number" class="plan-input" step="0.25" min="0" value="" ` +
-        `data-task-id="${taskId}" data-user-id="${userId}" data-year-month="${ym}" ` +
-        `hx-post="/assignments/plans" hx-trigger="change" ` +
-        `hx-vals='js:{task_id: event.target.dataset.taskId, user_id: event.target.dataset.userId, year_month: event.target.dataset.yearMonth, planned_hours: event.target.value || 0}' ` +
-        `hx-swap="none"></td>`
-    ).join('');
-}
-
-function _replaceMonthlyCells(row, taskId, userId) {
-    const months = _getMonths();
-    const logCells = row.querySelectorAll('td.log-cell');
-    logCells.forEach((cell, i) => {
-        if (i < months.length) {
-            const ym = months[i];
-            const td = document.createElement('td');
-            td.className = 'plan-cell';
-            td.innerHTML = `<input type="number" class="plan-input" step="0.25" min="0" value="" ` +
-                `data-task-id="${taskId}" data-user-id="${userId}" data-year-month="${ym}" ` +
-                `hx-post="/assignments/plans" hx-trigger="change" ` +
-                `hx-vals='js:{task_id: event.target.dataset.taskId, user_id: event.target.dataset.userId, year_month: event.target.dataset.yearMonth, planned_hours: event.target.value || 0}' ` +
-                `hx-swap="none">`;
-            cell.replaceWith(td);
-        }
+    // oldTaskRow の位置に新要素群を挿入
+    const parent = oldTaskRow.parentNode;
+    const ref = oldTaskRow.nextSibling;
+    oldTaskRow.remove();
+    // DocumentFragment から children を取り出す（ライブコレクションなので配列化）
+    Array.from(template.content.children).forEach(el => {
+        parent.insertBefore(el, ref);
     });
-    htmx.process(row);
 }
 
-function _autocompleteHtml(taskId) {
-    return (
-        '<div class="assignee-autocomplete-wrapper">' +
-        `<input type="text" class="autocomplete-input assignee-autocomplete-input" ` +
-        `placeholder="ユーザーを検索..." autocomplete="off" ` +
-        `data-task-id="${taskId}" ` +
-        `oninput="searchAssignees(this, ${taskId})" ` +
-        `onfocus="searchAssignees(this, ${taskId})" ` +
-        `onblur="hideAssigneeAutocomplete(this)">` +
-        '<div class="autocomplete-dropdown assignee-autocomplete-dropdown"></div>' +
-        '</div>'
-    );
-}
-
-// --- バッジ更新（マルチモード用） ---
-
-function _updateAssigneeCount(taskId) {
-    const taskRow = document.querySelector(`.task-row[data-task-id="${taskId}"]`);
-    if (!taskRow) return;
-    // シングルモード（data-assignee-id あり）ではバッジなし
-    if (taskRow.dataset.assigneeId) return;
-    const assigned = document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"][data-assignee-id]`).length;
-    const badge = taskRow.querySelector('.assignee-count-badge');
-    if (!badge) return;
-    badge.textContent = assigned > 0 ? `${assigned}名` : '未割当';
-    badge.classList.toggle('assignee-count-zero', assigned === 0);
+function _getBaseMonth() {
+    return new URL(window.location.href).searchParams.get('base_month') || '';
 }
 
 // --- ＋ボタン: 担当行を追加 ---
@@ -313,134 +285,65 @@ function addAssigneeRow(taskId) {
 
     const hasSubRows = document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"]`).length > 0;
     const singleAssigneeId = taskRow.dataset.assigneeId;
-    const countCell = taskRow.querySelector('.assignee-count-cell');
 
     if (!singleAssigneeId && !hasSubRows) {
         // 0名モード: task-row内のautocompleteにフォーカス
-        const input = countCell.querySelector('.assignee-autocomplete-input');
+        const input = taskRow.querySelector('.assignee-autocomplete-input');
         if (input) input.focus();
         return;
     }
 
-    if (singleAssigneeId && !hasSubRows) {
-        // 1名モード → マルチモードに移行
-        const userName = countCell.querySelector('.assignee-display')?.textContent || '';
-        const planInput = taskRow.querySelector('.plan-input');
-        const userId = planInput ? planInput.dataset.userId : null;
+    // マルチモード or 1名→マルチ移行: サーバーから空サブ行を取得して追加
+    const body = new URLSearchParams();
+    const bm = _getBaseMonth();
+    if (bm) body.set('base_month', bm);
 
-        // 既存の担当者をサブ行に移動
-        _createAssigneeSubRow(taskId, taskRow, singleAssigneeId, userName, userId);
-        // 空のサブ行を追加
-        _createEmptySubRow(taskId, taskRow);
+    fetch(`/assignments/tasks/${taskId}/add-row`, { method: 'POST', body })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed');
+            return res.text();
+        })
+        .then(html => {
+            const template = document.createElement('template');
+            template.innerHTML = html;
+            const newRow = template.content.firstElementChild;
 
-        // task-rowをマルチモードに切り替え
-        delete taskRow.dataset.assigneeId;
-        countCell.innerHTML = '<span class="assignee-count-badge">1名</span>';
+            const existingSubs = document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"]`);
+            if (existingSubs.length > 0) {
+                existingSubs[existingSubs.length - 1].after(newRow);
+            } else {
+                taskRow.after(newRow);
+            }
 
-        // 作業列の−ボタンを除去
-        const minusBtn = taskRow.querySelector('.task-actions .btn-remove-assignee');
-        if (minusBtn) minusBtn.remove();
-        return;
-    }
-
-    // マルチモード: サブ行を追加
-    _createEmptySubRow(taskId, taskRow);
-}
-
-function _createAssigneeSubRow(taskId, taskRow, assigneeId, userName, userId) {
-    const pid = taskRow.dataset.projectId;
-    const iid = taskRow.dataset.issueId;
-    const planCells = userId ? _planCellsHtml(taskId, userId) : '<td class="log-cell"></td>'.repeat(_getMonthCellCount());
-
-    const tr = document.createElement('tr');
-    tr.className = 'assignee-sub-row';
-    tr.dataset.projectId = pid;
-    tr.dataset.issueId = iid;
-    tr.dataset.taskId = String(taskId);
-    tr.dataset.assigneeId = String(assigneeId);
-    tr.innerHTML =
-        '<td class="assignee-indent"><button type="button" class="btn-remove-assignee" onclick="removeAssigneeRow(this)" title="担当行を削除">−</button></td>' +
-        `<td class="assignee-name-cell"><span class="assignee-display">${_escapeHtml(userName)}</span></td>` +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td class="summary-cell plan-total-summary">-</td>' +
-        '<td></td>' +
-        planCells;
-
-    const existingSubs = document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"]`);
-    if (existingSubs.length > 0) {
-        existingSubs[existingSubs.length - 1].after(tr);
-    } else {
-        taskRow.after(tr);
-    }
-    htmx.process(tr);
-}
-
-function _createEmptySubRow(taskId, taskRow) {
-    const pid = taskRow.dataset.projectId;
-    const iid = taskRow.dataset.issueId;
-    const monthCount = _getMonthCellCount();
-    const emptyCells = '<td class="log-cell"></td>'.repeat(monthCount);
-
-    const tr = document.createElement('tr');
-    tr.className = 'assignee-sub-row';
-    tr.dataset.projectId = pid;
-    tr.dataset.issueId = iid;
-    tr.dataset.taskId = String(taskId);
-    tr.innerHTML =
-        '<td class="assignee-indent"><button type="button" class="btn-remove-assignee" onclick="removeAssigneeRow(this)" title="担当行を削除">−</button></td>' +
-        '<td class="assignee-name-cell">' + _autocompleteHtml(taskId) + '</td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td></td>' +
-        '<td class="summary-cell plan-total-summary">-</td>' +
-        '<td></td>' +
-        emptyCells;
-
-    const existingSubs = document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"]`);
-    if (existingSubs.length > 0) {
-        existingSubs[existingSubs.length - 1].after(tr);
-    } else {
-        taskRow.after(tr);
-    }
-
-    tr.querySelector('input').focus();
+            const input = newRow.querySelector('input');
+            if (input) input.focus();
+        });
 }
 
 // --- −ボタン: サブ行の削除 ---
 
 function removeAssigneeRow(button) {
-    const row = button.closest('tr');
+    const row = button.closest('.grid-row');
     if (!row) return;
     const assigneeId = row.dataset.assigneeId;
     const taskId = row.dataset.taskId;
 
-    const doRemove = () => {
-        row.remove();
-        // サブ行が全てなくなったらtask-rowをautocompleteモードに戻す
-        const remaining = document.querySelectorAll(`.assignee-sub-row[data-task-id="${taskId}"]`);
-        if (remaining.length === 0) {
-            _revertToAutocomplete(taskId);
-        } else {
-            _updateAssigneeCount(taskId);
-        }
-    };
-
     if (assigneeId) {
         if (!confirm('この担当を外しますか？')) return;
-        fetch(`/assignments/assignees/${assigneeId}`, { method: 'DELETE' })
-            .then(res => { if (res.ok) doRemove(); });
+        const params = new URLSearchParams();
+        const bm = _getBaseMonth();
+        if (bm) params.set('base_month', bm);
+        const qs = params.toString();
+
+        fetch(`/assignments/assignees/${assigneeId}${qs ? '?' + qs : ''}`, { method: 'DELETE' })
+            .then(res => {
+                if (!res.ok) throw new Error('Failed');
+                return res.text();
+            })
+            .then(html => _replaceTaskBlock(taskId, html));
     } else {
-        doRemove();
+        // 未割当のサブ行は即削除（サーバー操作不要）
+        row.remove();
     }
 }
 
@@ -455,30 +358,17 @@ function removeTaskAssignee(button) {
 
     if (!confirm('この担当を外しますか？')) return;
 
-    fetch(`/assignments/assignees/${assigneeId}`, { method: 'DELETE' })
+    const params = new URLSearchParams();
+    const bm = _getBaseMonth();
+    if (bm) params.set('base_month', bm);
+    const qs = params.toString();
+
+    fetch(`/assignments/assignees/${assigneeId}${qs ? '?' + qs : ''}`, { method: 'DELETE' })
         .then(res => {
-            if (res.ok) {
-                // autocompleteモードに戻す
-                delete taskRow.dataset.assigneeId;
-                const countCell = taskRow.querySelector('.assignee-count-cell');
-                countCell.innerHTML = _autocompleteHtml(taskId);
-                // −ボタンを除去
-                button.remove();
-            }
-        });
-}
-
-// --- task-rowをautocompleteモードに戻す ---
-
-function _revertToAutocomplete(taskId) {
-    const taskRow = document.querySelector(`.task-row[data-task-id="${taskId}"]`);
-    if (!taskRow) return;
-    delete taskRow.dataset.assigneeId;
-    const countCell = taskRow.querySelector('.assignee-count-cell');
-    countCell.innerHTML = _autocompleteHtml(taskId);
-    // 作業列の−ボタンがあれば除去
-    const minusBtn = taskRow.querySelector('.task-actions .btn-remove-assignee');
-    if (minusBtn) minusBtn.remove();
+            if (!res.ok) throw new Error('Failed');
+            return res.text();
+        })
+        .then(html => _replaceTaskBlock(taskId, html));
 }
 
 // --- オートコンプリート検索 ---
@@ -508,58 +398,16 @@ function hideAssigneeAutocomplete(input) {
 // --- ユーザー選択 ---
 
 function selectAssignee(taskId, userId) {
-    // アクティブな入力欄を特定（task-row内 or サブ行内）
-    const allInputs = document.querySelectorAll(`.assignee-autocomplete-input[data-task-id="${taskId}"]`);
-    let activeInput = null;
-    allInputs.forEach(inp => { if (document.activeElement === inp) activeInput = inp; });
-    const targetRow = activeInput ? activeInput.closest('tr') : null;
+    const body = new URLSearchParams({ task_id: taskId, user_id: userId });
+    const bm = _getBaseMonth();
+    if (bm) body.set('base_month', bm);
 
-    // どちらにもない場合: 最初の空サブ行 or task-row
-    const fallbackRow = targetRow ||
-        document.querySelector(`.assignee-sub-row[data-task-id="${taskId}"]:not([data-assignee-id])`) ||
-        document.querySelector(`.task-row[data-task-id="${taskId}"]`);
-
-    fetch('/assignments/assignees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `task_id=${taskId}&user_id=${userId}`
-    })
-    .then(res => {
-        if (!res.ok) throw new Error('Failed');
-        return res.json();
-    })
-    .then(data => {
-        if (!fallbackRow) return;
-
-        if (fallbackRow.classList.contains('task-row')) {
-            // task-row内（0名モード → 1名モードに移行）
-            fallbackRow.dataset.assigneeId = data.assignee_id;
-            const countCell = fallbackRow.querySelector('.assignee-count-cell');
-            countCell.innerHTML = `<span class="assignee-display">${_escapeHtml(data.user_name)}</span>`;
-            // 月セルを計画入力欄に置き換え
-            _replaceMonthlyCells(fallbackRow, taskId, userId);
-            // 作業列に−ボタンを追加
-            const taskActions = fallbackRow.querySelector('.task-actions');
-            const plusBtn = taskActions.querySelector('.btn-add-assignee');
-            if (plusBtn && !taskActions.querySelector('.btn-remove-assignee')) {
-                const minusBtn = document.createElement('button');
-                minusBtn.type = 'button';
-                minusBtn.className = 'btn-remove-assignee';
-                minusBtn.setAttribute('onclick', 'removeTaskAssignee(this)');
-                minusBtn.title = '担当を外す';
-                minusBtn.textContent = '−';
-                plusBtn.after(minusBtn);
-            }
-        } else {
-            // サブ行内
-            fallbackRow.dataset.assigneeId = data.assignee_id;
-            const nameCell = fallbackRow.querySelector('.assignee-name-cell');
-            nameCell.innerHTML = `<span class="assignee-display">${_escapeHtml(data.user_name)}</span>`;
-            // 月セルを計画入力欄に置き換え
-            _replaceMonthlyCells(fallbackRow, taskId, userId);
-            _updateAssigneeCount(taskId);
-        }
-    });
+    fetch('/assignments/assignees', { method: 'POST', body })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed');
+            return res.text();
+        })
+        .then(html => _replaceTaskBlock(taskId, html));
 }
 
 // === グリッド読み込み後の折り畳み状態復元 ===

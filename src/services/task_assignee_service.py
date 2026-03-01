@@ -96,6 +96,16 @@ class TaskAssigneeService:
         return dict(row) if row else None
 
     @staticmethod
+    def get_user_ids_for_task(task_id: int) -> list[int]:
+        """作業の担当ユーザーIDリストを取得"""
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT user_id FROM task_assignee WHERE task_id = ?",
+                (task_id,)
+            ).fetchall()
+        return [r['user_id'] for r in rows]
+
+    @staticmethod
     def create(task_id: int, user_id: int) -> int:
         """担当割当作成"""
         with get_db() as conn:

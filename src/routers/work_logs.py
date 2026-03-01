@@ -8,15 +8,16 @@ from datetime import datetime, date, timedelta
 
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from services import WorkLogService, UserService, ProjectService, IssueService, TaskStatusService, TaskTagService, IssueTagService, StatusService
+from services import WorkLogService, IssueService
 from .common import (
     templates, get_current_month, parse_month, get_month_dates, get_prev_next_month,
     get_week_dates, get_prev_next_week, get_week_range_str, parse_week_date, WEEKDAY_NAMES,
     render_view_toggle,
     FilterParams, get_filter_params
 )
-from .common.filters import collect_unique_issue_statuses, collect_unique_task_statuses, render_common_filter_groups
+from .common.filters import render_common_filter_groups
 from .common.grid_renderer import render_grid
+from .common.grid_data import load_grid_context
 
 router = APIRouter(prefix="/work-logs", tags=["work_logs"])
 
@@ -120,27 +121,11 @@ def get_grid(filters: FilterParams = Depends(get_filter_params), month: str = No
     if view not in ("week", "month"):
         view = "week"
 
-    users = UserService.get_active_list()
-    projects = ProjectService.get_list()
-    issues = IssueService.get_list()
-    all_tags = IssueTagService.get_list()
+    ctx = load_grid_context(filters)
 
-    # ステータス選択肢を全プロジェクト・全案件から収集（重複排除、ID付き）
-    issue_statuses = collect_unique_issue_statuses(projects)
-    task_statuses_all = collect_unique_task_statuses(issues)
-
-    # ステータスIDをコードに変換してサービスに渡す
-    issue_status_codes = StatusService.resolve_ids_to_codes(filters.issue_status) if filters.issue_status else None
-    task_status_codes = TaskStatusService.resolve_ids_to_codes(filters.task_status) if filters.task_status else None
-
-    rows = WorkLogService.get_assignee_rows(
-        filters.user or None, filters.project or None, filters.issue or None, filters.tag or None,
-        issue_status_codes, task_status_codes, filters.exclude_done_issue, filters.exclude_done_task
-    )
-
-    filter_args = (users, projects, issues, all_tags,
+    filter_args = (ctx.users, ctx.projects, ctx.issues, ctx.all_tags,
                    filters.user, filters.project, filters.issue, filters.tag,
-                   issue_statuses, task_statuses_all,
+                   ctx.issue_statuses, ctx.task_statuses_all,
                    filters.issue_status, filters.task_status,
                    filters.exclude_done_issue, filters.exclude_done_task)
 
@@ -158,16 +143,7 @@ def get_grid(filters: FilterParams = Depends(get_filter_params), month: str = No
         filters.project if filters.project else None,
         filters.issue if filters.issue else None
     )
-    # 作業タグを一括取得
-    issue_ids = list({r['issue_id'] for r in rows})
-    tags_map: dict[int, list[dict]] = {}
-    for iid in issue_ids:
-        tags_map.update(TaskTagService.get_task_tags_map(iid))
-    # ステータスラベルを一括取得
-    project_ids = list({r['project_id'] for r in rows})
-    status_labels_map = {pid: IssueService.get_status_labels(pid) for pid in project_ids}
-    task_status_labels_map = {iid: TaskStatusService.get_status_labels(iid) for iid in issue_ids}
-    grid_html = render_grid(dates, rows, work_logs, view, tags_map, status_labels_map, task_status_labels_map)
+    grid_html = render_grid(dates, ctx.rows, work_logs, view, ctx.tags_map, ctx.status_labels_map, ctx.task_status_labels_map)
 
     return HTMLResponse(filter_html + grid_html)
 

@@ -50,6 +50,33 @@ class TaskTagService:
         return result
 
     @staticmethod
+    def get_task_tags_map_bulk(issue_ids: list[int]) -> dict[int, list[dict]]:
+        """複数案件の全作業タグマップを一括取得"""
+        if not issue_ids:
+            return {}
+        placeholders = ",".join("?" * len(issue_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"""SELECT tt.task_id, it.id, it.name, it.color, it.sort_order
+                   FROM task_tag tt
+                   JOIN issue_tag it ON tt.tag_id = it.id
+                   JOIN task t ON tt.task_id = t.id
+                   WHERE t.issue_id IN ({placeholders})
+                   ORDER BY it.sort_order ASC""",
+                issue_ids
+            ).fetchall()
+        result: dict[int, list[dict]] = {}
+        for r in rows:
+            task_id = r['task_id']
+            if task_id not in result:
+                result[task_id] = []
+            result[task_id].append({
+                'id': r['id'], 'name': r['name'],
+                'color': r['color'], 'sort_order': r['sort_order']
+            })
+        return result
+
+    @staticmethod
     def toggle(task_id: int, tag_id: int) -> bool:
         """タグ付与のトグル（存在すれば削除、なければ追加）
 

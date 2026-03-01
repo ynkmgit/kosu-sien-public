@@ -21,6 +21,7 @@ from .task_status_service import TaskStatusService
 from .issue_tag_service import IssueTagService
 from .task_tag_service import TaskTagService
 from .task_monthly_plan_service import TaskMonthlyPlanService
+from .assignment_aggregation_service import AssignmentAggregationService
 
 __all__ = [
     "ProjectService",
@@ -41,4 +42,5 @@ __all__ = [
     "IssueTagService",
     "TaskTagService",
     "TaskMonthlyPlanService",
+    "AssignmentAggregationService",
 ]

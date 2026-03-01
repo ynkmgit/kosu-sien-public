@@ -75,6 +75,19 @@ class IssueTagService:
         return cur.rowcount > 0
 
     @staticmethod
+    def resolve_ids_to_names(tag_ids: list[int]) -> list[str]:
+        """タグIDリストからユニークな名前リストを取得"""
+        if not tag_ids:
+            return []
+        placeholders = ",".join("?" * len(tag_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT DISTINCT name FROM issue_tag WHERE id IN ({placeholders})",
+                tag_ids
+            ).fetchall()
+        return [r['name'] for r in rows]
+
+    @staticmethod
     def is_in_use(tag_id: int) -> bool:
         """タグが作業で使用中かチェック"""
         with get_db() as conn:

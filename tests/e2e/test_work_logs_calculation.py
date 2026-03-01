@@ -57,8 +57,11 @@ def test_work_logs_realtime_calculation(page: Page, base_url: str, setup_test_da
     grand_total = page.locator(".grand-total").text_content()
     assert grand_total in ["0.0h", "-", ""], f"初期状態の総合計が想定外: {grand_total}"
 
-    # 最初のセルに値を入力
-    first_input = page.locator(".log-input").first
+    # 最初のセルをクリックしてinputを表示（click-to-edit）
+    first_cell = page.locator(".log-cell").first
+    first_cell.click()
+    page.wait_for_timeout(100)
+    first_input = first_cell.locator(".log-input")
     first_input.fill("2.5")
     first_input.blur()  # フォーカスを外す
 
@@ -165,15 +168,18 @@ def test_multiple_inputs_calculation(page: Page, base_url: str, setup_test_data)
     page.wait_for_timeout(1000)
     page.wait_for_selector(".log-table, .week-table", timeout=5000)
 
-    # 複数のセルに値を入力
-    inputs = page.locator(".log-input")
-    count = min(inputs.count(), 5)  # 最大5セル
+    # 複数のセルに値を入力（click-to-edit: セルクリック→input表示→入力→blur）
+    cells = page.locator(".log-cell")
+    count = min(cells.count(), 5)  # 最大5セル
 
     total_expected = 0.0
     for i in range(count):
         value = (i + 1) * 1.25  # 1.25, 2.5, 3.75, 5.0, 6.25
-        inputs.nth(i).fill(str(value))
-        inputs.nth(i).blur()
+        cells.nth(i).click()
+        page.wait_for_timeout(100)
+        input_el = cells.nth(i).locator(".log-input")
+        input_el.fill(str(value))
+        input_el.blur()
         total_expected += value
         page.wait_for_timeout(100)
 

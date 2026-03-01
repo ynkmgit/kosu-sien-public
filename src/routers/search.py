@@ -4,9 +4,10 @@
 """
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
-from markupsafe import escape
+from html import escape
 
-from services import UserService, ProjectService, IssueService, IssueTagService, StatusService, TaskStatusService
+from services import UserService, ProjectService, IssueService, IssueTagService, StatusService, TaskStatusService, TaskAssigneeService
+from .common.renders import TAG_DEFAULT_COLOR
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -46,6 +47,18 @@ def _filter_items(items: list[dict], q: str, exclude: list[int], search_fields: 
 def _render_empty() -> HTMLResponse:
     """空結果のHTML"""
     return HTMLResponse('<div class="autocomplete-empty">該当なし</div>')
+
+
+def _collect_unique_from_bulk(bulk: dict[int, list[dict]]) -> list[dict]:
+    """バルク取得結果からcode重複排除で収集"""
+    seen = set()
+    result = []
+    for statuses in bulk.values():
+        for s in statuses:
+            if s['code'] not in seen:
+                seen.add(s['code'])
+                result.append(s)
+    return result
 
 
 @router.get("/users", response_class=HTMLResponse)
@@ -101,17 +114,24 @@ def search_issues(q: str = "", exclude: list[int] = Query(default=[])):
 
 @router.get("/tags", response_class=HTMLResponse)
 def search_tags(q: str = "", exclude: list[int] = Query(default=[])):
-    """タグ検索（オートコンプリート用）"""
+    """タグ検索（オートコンプリート用・名前重複排除）"""
     tags = IssueTagService.get_list()
-    results = _filter_items(tags, q, exclude, ['name', 'issue_cd', 'issue_name'])
+    # 名前で重複排除（最初に見つかったものを代表として使用）
+    seen_names = set()
+    unique_tags = []
+    for t in tags:
+        if t['name'] not in seen_names:
+            seen_names.add(t['name'])
+            unique_tags.append(t)
+    results = _filter_items(unique_tags, q, exclude, ['name'])
 
     if not results:
         return _render_empty()
 
     items = "".join(
         f'<div class="autocomplete-item" onclick="selectAutocomplete(\'tag\', {t["id"]}, \'{escape(t["name"])}\')">'
-        f'<span class="color-preview" style="background:{escape(t["color"] or "#6b7280")}"></span>'
-        f'[{escape(t["issue_cd"])}] {escape(t["name"])}</div>'
+        f'<span class="color-preview" style="background:{escape(t["color"] or TAG_DEFAULT_COLOR)}"></span>'
+        f'{escape(t["name"])}</div>'
         for t in results
     )
     return HTMLResponse(items)
@@ -120,16 +140,8 @@ def search_tags(q: str = "", exclude: list[int] = Query(default=[])):
 @router.get("/task_users", response_class=HTMLResponse)
 def search_task_users(task_id: int, q: str = ""):
     """作業の担当追加用ユーザー検索（既存担当除外）"""
-    from database import get_db
     users = UserService.get_active_list()
-
-    with get_db() as conn:
-        assigned = conn.execute(
-            "SELECT user_id FROM task_assignee WHERE task_id = ?",
-            (task_id,)
-        ).fetchall()
-    exclude = [r['user_id'] for r in assigned]
-
+    exclude = TaskAssigneeService.get_user_ids_for_task(task_id)
     results = _filter_items(users, q, exclude, ['cd', 'name'])
 
     if not results:
@@ -143,29 +155,12 @@ def search_task_users(task_id: int, q: str = ""):
     return HTMLResponse(items)
 
 
-def _collect_unique_statuses(table: str, scope_col: str, scope_ids: list[int]) -> list[dict]:
-    """ステータスをcode重複排除で収集（{id, name, code}）"""
-    from database import get_db
-    seen = set()
-    result = []
-    for sid in scope_ids:
-        with get_db() as conn:
-            rows = conn.execute(
-                f"SELECT id, code, name FROM {table} WHERE {scope_col} = ? ORDER BY sort_order",
-                (sid,)
-            ).fetchall()
-        for r in rows:
-            if r['code'] not in seen:
-                seen.add(r['code'])
-                result.append(dict(r))
-    return result
-
-
 @router.get("/issue_statuss", response_class=HTMLResponse)
 def search_issue_statuses(q: str = "", exclude: list[int] = Query(default=[])):
     """案件ステータス検索（オートコンプリート用）"""
     projects = ProjectService.get_list()
-    all_statuses = _collect_unique_statuses("project_status", "project_id", [p['id'] for p in projects])
+    bulk = StatusService.get_all_bulk([p['id'] for p in projects])
+    all_statuses = _collect_unique_from_bulk(bulk)
     results = _filter_items(all_statuses, q, exclude, ['name'])
 
     if not results:
@@ -183,7 +178,8 @@ def search_issue_statuses(q: str = "", exclude: list[int] = Query(default=[])):
 def search_task_statuses(q: str = "", exclude: list[int] = Query(default=[])):
     """作業ステータス検索（オートコンプリート用）"""
     issues = IssueService.get_list()
-    all_statuses = _collect_unique_statuses("task_status", "issue_id", [i['id'] for i in issues])
+    bulk = TaskStatusService.get_all_bulk([i['id'] for i in issues])
+    all_statuses = _collect_unique_from_bulk(bulk)
     results = _filter_items(all_statuses, q, exclude, ['name'])
 
     if not results:

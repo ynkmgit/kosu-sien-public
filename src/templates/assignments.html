@@ -14,11 +14,10 @@
 <div class="table-card">
     <div class="table-header">
         <span class="table-title">アサイングリッド</span>
-        <span class="table-hint">当月～6ヵ月先</span>
     </div>
     <div class="table-wrapper">
         <div id="grid-container"
-             hx-get="/assignments/grid?{% for u in selected_users %}user={{ u }}&{% endfor %}{% for p in selected_projects %}project={{ p }}&{% endfor %}{% for i in selected_issues %}issue={{ i }}&{% endfor %}{% for t in selected_tags %}tag={{ t }}&{% endfor %}{% for s in selected_issue_statuses %}issue_status={{ s }}&{% endfor %}{% for s in selected_task_statuses %}task_status={{ s }}&{% endfor %}{% if exclude_done_issue %}exclude_done_issue=true&{% endif %}{% if exclude_done_task %}exclude_done_task=true&{% endif %}"
+             hx-get="/assignments/grid?{% for u in selected_users %}user={{ u }}&{% endfor %}{% for p in selected_projects %}project={{ p }}&{% endfor %}{% for i in selected_issues %}issue={{ i }}&{% endfor %}{% for t in selected_tags %}tag={{ t }}&{% endfor %}{% for s in selected_issue_statuses %}issue_status={{ s }}&{% endfor %}{% for s in selected_task_statuses %}task_status={{ s }}&{% endfor %}{% if exclude_done_issue %}exclude_done_issue=true&{% endif %}{% if exclude_done_task %}exclude_done_task=true&{% endif %}{% if base_month %}base_month={{ base_month }}&{% endif %}"
              hx-trigger="load"
              hx-swap="innerHTML">
             <p class="loading">
@@ -29,6 +28,6 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', path='js/autocomplete.js') }}"></script>
-<script src="{{ url_for('static', path='js/assignments.js') }}"></script>
+<script src="{{ static_url('js/autocomplete.js') }}"></script>
+<script src="{{ static_url('js/assignments.js') }}"></script>
 {% endblock %}

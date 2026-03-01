@@ -4,6 +4,7 @@
 """
 from datetime import date
 from database import get_db
+from .query_helpers import add_in_filter, add_in_subquery_filter
 
 
 class WorkLogService:
@@ -169,7 +170,7 @@ class WorkLogService:
         return result[0] if result else 0
 
     @staticmethod
-    def get_assignee_rows(user_ids: list[int] = None, project_ids: list[int] = None, issue_ids: list[int] = None, tag_ids: list[int] = None,
+    def get_assignee_rows(user_ids: list[int] = None, project_ids: list[int] = None, issue_ids: list[int] = None, tag_names: list[str] = None,
                           issue_statuses: list[str] = None, task_statuses: list[str] = None,
                           exclude_done_issue: bool = False, exclude_done_task: bool = False,
                           include_unassigned: bool = False) -> list[dict]:
@@ -190,7 +191,7 @@ class WorkLogService:
                         ta.progress_rate,
                         t.status as task_status,
                         t.estimate_hours,
-                        (SELECT COALESCE(SUM(w.hours), 0) FROM work_log w WHERE w.task_id = t.id) as actual_hours,
+                        COALESCE(wl_sum.total_hours, 0) as actual_hours,
                         i.id as issue_id,
                         i.status as issue_status,
                         i.cd as issue_cd,
@@ -205,6 +206,10 @@ class WorkLogService:
                     JOIN project p ON i.project_id = p.id
                     LEFT JOIN task_assignee ta ON ta.task_id = t.id
                     LEFT JOIN user u ON ta.user_id = u.id
+                    LEFT JOIN (
+                        SELECT task_id, SUM(hours) as total_hours
+                        FROM work_log GROUP BY task_id
+                    ) wl_sum ON wl_sum.task_id = t.id
                     WHERE (u.is_active = 1 OR u.is_active IS NULL OR ta.id IS NULL)
                 """
             else:
@@ -218,7 +223,7 @@ class WorkLogService:
                         ta.progress_rate,
                         t.status as task_status,
                         t.estimate_hours,
-                        (SELECT COALESCE(SUM(w.hours), 0) FROM work_log w WHERE w.task_id = t.id) as actual_hours,
+                        COALESCE(wl_sum.total_hours, 0) as actual_hours,
                         i.id as issue_id,
                         i.status as issue_status,
                         i.cd as issue_cd,
@@ -233,39 +238,24 @@ class WorkLogService:
                     JOIN issue i ON t.issue_id = i.id
                     JOIN project p ON i.project_id = p.id
                     JOIN user u ON ta.user_id = u.id
+                    LEFT JOIN (
+                        SELECT task_id, SUM(hours) as total_hours
+                        FROM work_log GROUP BY task_id
+                    ) wl_sum ON wl_sum.task_id = t.id
                     WHERE (u.is_active = 1 OR u.is_active IS NULL)
                 """
             params = []
 
-            if user_ids:
-                placeholders = ",".join("?" * len(user_ids))
-                query += f" AND ta.user_id IN ({placeholders})"
-                params.extend(user_ids)
-
-            if project_ids:
-                placeholders = ",".join("?" * len(project_ids))
-                query += f" AND p.id IN ({placeholders})"
-                params.extend(project_ids)
-
-            if issue_ids:
-                placeholders = ",".join("?" * len(issue_ids))
-                query += f" AND i.id IN ({placeholders})"
-                params.extend(issue_ids)
-
-            if tag_ids:
-                placeholders = ",".join("?" * len(tag_ids))
-                query += f" AND t.id IN (SELECT task_id FROM task_tag WHERE tag_id IN ({placeholders}))"
-                params.extend(tag_ids)
-
-            if issue_statuses:
-                placeholders = ",".join("?" * len(issue_statuses))
-                query += f" AND i.status IN ({placeholders})"
-                params.extend(issue_statuses)
-
-            if task_statuses:
-                placeholders = ",".join("?" * len(task_statuses))
-                query += f" AND t.status IN ({placeholders})"
-                params.extend(task_statuses)
+            query = add_in_filter(query, params, "ta.user_id", user_ids)
+            query = add_in_filter(query, params, "p.id", project_ids)
+            query = add_in_filter(query, params, "i.id", issue_ids)
+            query = add_in_subquery_filter(
+                query, params,
+                "t.id IN (SELECT task_id FROM task_tag WHERE tag_id IN (SELECT id FROM issue_tag WHERE name IN ({placeholders})))",
+                tag_names
+            )
+            query = add_in_filter(query, params, "i.status", issue_statuses)
+            query = add_in_filter(query, params, "t.status", task_statuses)
 
             if exclude_done_issue:
                 query += " AND NOT EXISTS (SELECT 1 FROM project_status ps WHERE ps.project_id = p.id AND ps.code = i.status AND ps.is_done = 1)"
@@ -301,20 +291,9 @@ class WorkLogService:
             """
             params = [start_date, end_date]
 
-            if user_ids:
-                placeholders = ",".join("?" * len(user_ids))
-                query += f" AND wl.user_id IN ({placeholders})"
-                params.extend(user_ids)
-
-            if project_ids:
-                placeholders = ",".join("?" * len(project_ids))
-                query += f" AND p.id IN ({placeholders})"
-                params.extend(project_ids)
-
-            if issue_ids:
-                placeholders = ",".join("?" * len(issue_ids))
-                query += f" AND i.id IN ({placeholders})"
-                params.extend(issue_ids)
+            query = add_in_filter(query, params, "wl.user_id", user_ids)
+            query = add_in_filter(query, params, "p.id", project_ids)
+            query = add_in_filter(query, params, "i.id", issue_ids)
 
             rows = conn.execute(query, params).fetchall()
 

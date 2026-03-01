@@ -4,69 +4,61 @@
 """
 from html import escape
 
+TAG_DEFAULT_COLOR = "#6b7280"
 
 # === グリッドUI部品 ===
 
 def render_log_cell(task_id: int, user_id: int, date_str: str, hours: float, extra_classes: str = "") -> str:
-    """工数入力セルHTML生成"""
+    """工数入力セルHTML生成（click-to-edit: テキスト表示、クリックでinput生成）"""
     hours_display = f"{hours:.2f}" if hours > 0 else ""
-    cell_class = f"log-cell{extra_classes}"
-    return f'''<td class="{cell_class}">
-        <input type="number" class="log-input" step="0.25" min="0.25"
-               value="{hours_display}"
-               data-task-id="{task_id}"
-               data-user-id="{user_id}"
-               data-date="{date_str}"
-               hx-post="/work-logs"
-               hx-trigger="change"
-               hx-vals='js:{{task_id: event.target.dataset.taskId, user_id: event.target.dataset.userId, work_date: event.target.dataset.date, hours: event.target.value || 0}}'
-               hx-swap="none">
-    </td>'''
+    cell_class = f"gc log-cell numeric{extra_classes}"
+    return (f'<div class="{cell_class}"'
+            f' data-task-id="{task_id}"'
+            f' data-user-id="{user_id}"'
+            f' data-date="{date_str}">{hours_display}</div>')
 
 
 def render_progress_cell(assignee_id: int, progress_rate) -> str:
-    """進捗率入力セルHTML生成（担当者単位）"""
-    progress_display = str(progress_rate) if progress_rate is not None else ""
-    return f'''<td class="progress-cell">
-        <input type="number" class="progress-input" step="1" min="0" max="100"
-               value="{progress_display}"
-               placeholder="-"
-               data-assignee-id="{assignee_id}"
-               hx-put="/assignments/assignees/{assignee_id}/progress"
-               hx-trigger="change"
-               hx-vals='js:{{progress_rate: event.target.value}}'
-               hx-swap="none">
-    </td>'''
+    """進捗率セルHTML生成（click-to-edit: テキスト表示、クリックでinput生成）"""
+    progress_display = f"{progress_rate}%" if progress_rate is not None else ""
+    return (f'<div class="gc progress-cell numeric"'
+            f' data-assignee-id="{assignee_id}"'
+            f' data-value="{progress_rate if progress_rate is not None else ""}">{progress_display}</div>')
 
 
 def render_estimate_cell(task_id: int, estimate_hours) -> str:
-    """見積工数入力セルHTML生成"""
+    """見積工数セルHTML生成（click-to-edit: テキスト表示、クリックでinput生成）"""
     display = f"{float(estimate_hours):.2f}" if estimate_hours else ""
-    return f'''<td class="estimate-cell">
-        <input type="number" class="estimate-input" step="0.25" min="0"
-               value="{display}"
-               data-task-id="{task_id}"
-               hx-put="/tasks/{task_id}/estimate"
-               hx-trigger="change"
-               hx-vals='js:{{estimate_hours: event.target.value}}'
-               hx-swap="none">
-    </td>'''
+    return (f'<div class="gc estimate-cell numeric"'
+            f' data-task-id="{task_id}"'
+            f' data-value="{display}">{display}</div>')
 
 
 def render_plan_cell(task_id: int, user_id: int, year_month: str, hours: float) -> str:
-    """月次計画入力セルHTML生成"""
-    hours_display = f"{hours:.2f}" if hours > 0 else ""
-    return f'''<td class="plan-cell">
-        <input type="number" class="plan-input" step="0.25" min="0"
-               value="{hours_display}"
-               data-task-id="{task_id}"
-               data-user-id="{user_id}"
-               data-year-month="{year_month}"
-               hx-post="/assignments/plans"
-               hx-trigger="change"
-               hx-vals='js:{{task_id: event.target.dataset.taskId, user_id: event.target.dataset.userId, year_month: event.target.dataset.yearMonth, planned_hours: event.target.value || 0}}'
-               hx-swap="none">
-    </td>'''
+    """月次計画入力セルHTML生成（空セルはinputなしで軽量化）"""
+    if hours > 0:
+        return f'''<div class="gc plan-cell numeric">
+            <input type="number" class="plan-input" step="0.25" min="0"
+                   value="{hours:.2f}"
+                   data-task-id="{task_id}"
+                   data-user-id="{user_id}"
+                   data-year-month="{year_month}">
+        </div>'''
+    return (f'<div class="gc plan-cell plan-cell-empty numeric"'
+            f' data-task-id="{task_id}"'
+            f' data-user-id="{user_id}"'
+            f' data-year-month="{year_month}"></div>')
+
+
+def render_tag_badges(tags: list[dict]) -> str:
+    """タグバッジHTML生成（グリッド用小サイズ）"""
+    if not tags:
+        return ""
+    badges = " ".join(
+        f'<span class="tag-badge tag-badge-sm" style="background:{escape(t["color"] or TAG_DEFAULT_COLOR)}">{escape(t["name"])}</span>'
+        for t in tags
+    )
+    return f' <span class="row-tags">{badges}</span>'
 
 
 def render_row_label(task_name: str) -> str:
@@ -76,41 +68,31 @@ def render_row_label(task_name: str) -> str:
 
 def render_user_cell(user_name: str) -> str:
     """担当者セルHTML生成"""
-    return f'<td class="user-cell">{escape(user_name)}</td>'
+    return f'<div class="gc user-cell">{escape(user_name)}</div>'
+
+
+def _render_status_cell(entity_id: int, current_status: str, status_labels: dict,
+                        id_attr: str, action: str) -> str:
+    """ステータスセルHTML生成（click-to-edit: テキスト表示、クリックでselect生成）"""
+    import json as _json
+    current = current_status or 'open'
+    label = escape(status_labels.get(current, current))
+    labels_json = escape(_json.dumps(status_labels, ensure_ascii=False))
+    return (f'<div class="gc status-cell status-{current}"'
+            f' data-{id_attr}="{entity_id}"'
+            f' data-action="{action}"'
+            f' data-status="{current}"'
+            f' data-labels="{labels_json}">{label}</div>')
 
 
 def render_task_status_cell(task_id: int, current_status: str, status_labels: dict) -> str:
     """作業ステータスセレクトセルHTML生成（グリッド用）"""
-    current = current_status or 'open'
-    options = "".join(
-        f'<option value="{s}" {"selected" if s == current else ""}>{escape(label)}</option>'
-        for s, label in status_labels.items()
-    )
-    return f'''<td class="status-cell">
-        <select class="grid-status-select status-{current}"
-                hx-put="/tasks/{task_id}/status"
-                hx-trigger="change"
-                hx-vals='js:{{status: event.target.value}}'
-                hx-swap="none"
-                onchange="updateStatusClass(this)">{options}</select>
-    </td>'''
+    return _render_status_cell(task_id, current_status, status_labels, "task-id", "task-status")
 
 
 def render_issue_status_cell(issue_id: int, current_status: str, status_labels: dict) -> str:
     """案件ステータスセレクトセルHTML生成（グリッド用）"""
-    current = current_status or 'open'
-    options = "".join(
-        f'<option value="{s}" {"selected" if s == current else ""}>{escape(label)}</option>'
-        for s, label in status_labels.items()
-    )
-    return f'''<td class="status-cell">
-        <select class="grid-status-select status-{current}"
-                hx-put="/work-logs/issue-status/{issue_id}"
-                hx-trigger="change"
-                hx-vals='js:{{status: event.target.value}}'
-                hx-swap="none"
-                onchange="updateStatusClass(this)">{options}</select>
-    </td>'''
+    return _render_status_cell(issue_id, current_status, status_labels, "issue-id", "issue-status")
 
 
 # === CRUDアクション部品 ===

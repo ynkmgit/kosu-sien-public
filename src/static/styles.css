@@ -24,10 +24,71 @@
     --alert-glow: rgba(249, 115, 22, 0.15);
     --critical: #a855f7;
     --critical-glow: rgba(168, 85, 247, 0.15);
-    --bg-primary: #141414;
-    --bg-secondary: #232323;
     --accent-subtle: rgba(212, 165, 116, 0.08);
     --accent-light: rgba(212, 165, 116, 0.1);
+    --accent-faint: rgba(212, 165, 116, 0.03);
+    --accent-tint: rgba(212, 165, 116, 0.04);
+    --accent-dim: rgba(212, 165, 116, 0.05);
+    --accent-soft: rgba(212, 165, 116, 0.06);
+    --accent-mid: rgba(212, 165, 116, 0.12);
+    --accent-strong: rgba(212, 165, 116, 0.2);
+    --accent-border: rgba(212, 165, 116, 0.3);
+    --bg-gradient-end: #1c1917;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --negative: #ef4444;
+    --negative-glow: rgba(239, 68, 68, 0.1);
+    --done: #22c55e;
+    --badge-text: #fff;
+    --weekend-bg: rgba(128, 128, 128, 0.2);
+    --weekend-bg-cell: rgba(128, 128, 128, 0.1);
+    --muted-bg: rgba(107, 114, 128, 0.15);
+    --tag-default: #6b7280;
+}
+
+/* ライトテーマ（将来のテーマ切替用に定義のみ） */
+[data-theme="light"] {
+    --bg-deep: #f5f5f0;
+    --bg-base: #eae8e3;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8f6f3;
+    --bg-input: #ffffff;
+    --border: #d4d0ca;
+    --border-subtle: #e8e4de;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5c5650;
+    --text-muted: #9a948e;
+    --accent: #b8875a;
+    --accent-hover: #a07040;
+    --accent-glow: rgba(184, 135, 90, 0.12);
+    --success: #4a8c4a;
+    --success-glow: rgba(74, 140, 74, 0.1);
+    --danger: #c05050;
+    --danger-glow: rgba(192, 80, 80, 0.1);
+    --caution: #d4a020;
+    --caution-glow: rgba(212, 160, 32, 0.1);
+    --alert: #d46010;
+    --alert-glow: rgba(212, 96, 16, 0.1);
+    --critical: #8b40d0;
+    --critical-glow: rgba(139, 64, 208, 0.1);
+    --accent-subtle: rgba(184, 135, 90, 0.06);
+    --accent-light: rgba(184, 135, 90, 0.08);
+    --accent-faint: rgba(184, 135, 90, 0.02);
+    --accent-tint: rgba(184, 135, 90, 0.03);
+    --accent-dim: rgba(184, 135, 90, 0.04);
+    --accent-soft: rgba(184, 135, 90, 0.05);
+    --accent-mid: rgba(184, 135, 90, 0.1);
+    --accent-strong: rgba(184, 135, 90, 0.15);
+    --accent-border: rgba(184, 135, 90, 0.25);
+    --bg-gradient-end: #eae5df;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --negative: #dc2626;
+    --negative-glow: rgba(220, 38, 38, 0.08);
+    --done: #16a34a;
+    --badge-text: #fff;
+    --weekend-bg: rgba(128, 128, 128, 0.1);
+    --weekend-bg-cell: rgba(128, 128, 128, 0.05);
+    --muted-bg: rgba(107, 114, 128, 0.1);
+    --tag-default: #6b7280;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -92,7 +153,7 @@ body::before {
 /* Main */
 .main {
     padding: 32px 48px;
-    background: linear-gradient(135deg, var(--bg-deep) 0%, #1c1917 100%);
+    background: linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-gradient-end) 100%);
     position: relative;
     overflow: hidden;
 }
@@ -211,7 +272,7 @@ tbody tr:last-child td { border-bottom: none; }
 .card:nth-child(1) { animation-delay: 0.3s; }
 .card:nth-child(2) { animation-delay: 0.4s; }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0; transition: opacity 0.3s; }
-.card:hover { background: var(--bg-card-hover); border-color: var(--border); transform: translateY(-4px); box-shadow: 0 20px 40px -20px rgba(0,0,0,0.5); }
+.card:hover { background: var(--bg-card-hover); border-color: var(--border); transform: translateY(-4px); box-shadow: 0 20px 40px -20px var(--shadow-color); }
 .card:hover::before { opacity: 1; }
 .card-icon { width: 48px; height: 48px; background: var(--accent-glow); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; color: var(--accent); }
 .card-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; }
@@ -232,70 +293,42 @@ tbody tr:last-child td { border-bottom: none; }
 .grid-status-select.status-open { color: var(--text-muted); }
 .grid-status-select.status-in_progress { color: var(--accent); border-color: var(--accent); }
 .grid-status-select.status-closed, .grid-status-select.status-done { color: var(--success); border-color: var(--success); }
-.status-cell { padding: 2px !important; }
-.status-header { width: 80px; }
+/* ステータスセル: 状態色 */
+.status-cell:hover { background: var(--bg-input); }
+.status-cell.status-open { color: var(--text-muted); }
+.status-cell.status-in_progress { color: var(--accent); }
+.status-cell.status-closed, .status-cell.status-done { color: var(--success); }
 
-/* Estimate Column */
-.estimate-header { width: 70px; max-width: 70px; }
-.estimate-cell { padding: 2px !important; }
+/* 見積入力 */
 .estimate-input {
-    width: 50px;
+    width: 100%;
     padding: 4px;
-    border: 1px solid transparent;
+    border: 1px solid var(--accent);
     border-radius: 4px;
-    background: transparent;
+    background: var(--bg-deep);
     color: var(--text-primary);
     text-align: right;
     font-size: 0.85rem;
 }
-.estimate-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    background: var(--bg-primary);
-}
+.estimate-input:focus { outline: none; }
 .estimate-input::-webkit-inner-spin-button,
 .estimate-input::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 .estimate-input { -moz-appearance: textfield; }
-.estimate-summary {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-.actual-header { width: 70px; max-width: 70px; }
-.actual-cell {
-    text-align: right;
-    font-size: 0.85rem;
-    padding: 2px 4px !important;
-    color: var(--text-primary);
-}
-.actual-summary {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-.remaining-header { width: 70px; max-width: 70px; }
-.remaining-cell {
-    text-align: right;
-    font-size: 0.85rem;
-    padding: 2px 4px !important;
-    color: var(--text-primary);
-}
-.remaining-summary {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-.remaining-negative { color: #ef4444 !important; }
-.plan-total-header { width: 70px; max-width: 70px; }
+
+/* 集計サマリー */
+.estimate-summary,
+.actual-summary,
+.remaining-summary,
 .plan-total-summary {
     font-weight: 500;
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
-.plan-cell { padding: 0 !important; }
+
+/* 計画入力 */
 .plan-input {
     width: 50px;
     padding: 4px;
@@ -309,7 +342,7 @@ tbody tr:last-child td { border-bottom: none; }
 .plan-input:focus {
     outline: none;
     border-color: var(--accent);
-    background: var(--bg-primary);
+    background: var(--bg-deep);
 }
 .plan-input::-webkit-inner-spin-button,
 .plan-input::-webkit-outer-spin-button {
@@ -319,10 +352,10 @@ tbody tr:last-child td { border-bottom: none; }
 .plan-input { -moz-appearance: textfield; }
 
 /* Tag Badge */
-.done-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; color: #fff; background: #22c55e; white-space: nowrap; line-height: 1.4; }
+.done-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; color: var(--badge-text); background: var(--done); white-space: nowrap; line-height: 1.4; }
 .center-cell { text-align: center; }
 .edit-checkbox { width: 16px; height: 16px; cursor: pointer; }
-.tag-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; color: #fff; white-space: nowrap; line-height: 1.4; }
+.tag-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; color: var(--badge-text); white-space: nowrap; line-height: 1.4; }
 .tag-badge-sm { padding: 1px 6px; font-size: 0.7rem; }
 .tag-checkbox { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; margin-right: 4px; }
 .tag-checkbox input[type="checkbox"] { margin: 0; cursor: pointer; }
@@ -343,7 +376,7 @@ tbody tr:last-child td { border-bottom: none; }
     border-radius: 4px;
     background: var(--accent-glow);
     color: var(--accent);
-    border: 1px solid rgba(212, 165, 116, 0.3);
+    border: 1px solid var(--accent-border);
 }
 .badge-empty {
     background: var(--bg-input);
@@ -445,7 +478,7 @@ tbody tr:last-child td { border-bottom: none; }
    共通コンポーネント: フィルター
    ======================================== */
 .filter-section {
-    background: var(--bg-secondary);
+    background: var(--bg-card);
     padding: 16px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -477,14 +510,14 @@ tbody tr:last-child td { border-bottom: none; }
     gap: 4px;
     padding: 4px 8px;
     background: var(--accent);
-    color: var(--bg-primary);
+    color: var(--bg-deep);
     border-radius: 4px;
     font-size: 0.85rem;
 }
 .tag-remove {
     background: none;
     border: none;
-    color: var(--bg-primary);
+    color: var(--bg-deep);
     cursor: pointer;
     padding: 0 2px;
     font-size: 1rem;
@@ -495,7 +528,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 6px 12px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
     font-size: 0.9rem;
     min-width: 150px;
@@ -504,7 +537,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 8px 12px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
     font-size: 0.9rem;
     min-width: 180px;
@@ -522,7 +555,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 6px 12px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
     font-size: 0.9rem;
     min-width: 150px;
@@ -544,7 +577,7 @@ tbody tr:last-child td { border-bottom: none; }
     overflow-y: auto;
     z-index: 1000;
     display: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 .autocomplete-dropdown.show { display: block; }
 .autocomplete-item {
@@ -577,7 +610,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 6px 12px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
     font-size: 0.9rem;
 }
@@ -611,7 +644,7 @@ tbody tr:last-child td { border-bottom: none; }
     margin-bottom: 32px;
 }
 .kpi-card {
-    background: var(--bg-secondary);
+    background: var(--bg-card);
     border-radius: 8px;
     padding: 20px;
     text-align: center;
@@ -641,7 +674,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 8px;
     text-align: center;
 }
-.matrix-table th { background: var(--bg-secondary); }
+.matrix-table th { background: var(--bg-card); }
 .matrix-table .task-header {
     text-align: left !important;
     min-width: 250px;
@@ -659,7 +692,7 @@ tbody tr:last-child td { border-bottom: none; }
     color: var(--text-muted);
     font-size: 0.85rem;
 }
-.matrix-table .task-row:hover { background: rgba(212, 165, 116, 0.05); }
+.matrix-table .task-row:hover { background: var(--accent-dim); }
 .matrix-table .task-name {
     text-align: left !important;
     padding-left: 16px !important;
@@ -669,7 +702,7 @@ tbody tr:last-child td { border-bottom: none; }
     cursor: pointer;
     transition: background 0.15s;
 }
-.matrix-table .task-cell:hover { background: rgba(212, 165, 116, 0.2); }
+.matrix-table .task-cell:hover { background: var(--accent-strong); }
 .matrix-table .task-cell.assigned {
     color: var(--accent);
     font-weight: bold;
@@ -699,7 +732,7 @@ tbody tr:last-child td { border-bottom: none; }
     text-align: center;
 }
 .assign-table th {
-    background: var(--bg-secondary);
+    background: var(--bg-card);
     font-weight: 500;
 }
 .assign-table .user-header {
@@ -713,9 +746,9 @@ tbody tr:last-child td { border-bottom: none; }
 .assign-table .total-header {
     min-width: 80px;
     background: var(--accent) !important;
-    color: var(--bg-primary) !important;
+    color: var(--bg-deep) !important;
 }
-.assign-table .user-row:hover { background: rgba(212, 165, 116, 0.05); }
+.assign-table .user-row:hover { background: var(--accent-dim); }
 .assign-table .user-name {
     text-align: left !important;
     font-weight: 500;
@@ -729,7 +762,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
     text-align: right;
     font-size: 0.9rem;
@@ -759,14 +792,14 @@ tbody tr:last-child td { border-bottom: none; }
     font-size: 0.75rem;
     color: var(--text-muted);
 }
-.assign-table .total-row { background: var(--bg-secondary); }
+.assign-table .total-row { background: var(--bg-card); }
 .assign-table .total-label {
     text-align: left !important;
     font-weight: 600;
 }
 .assign-table .grand-total {
     background: var(--accent) !important;
-    color: var(--bg-primary) !important;
+    color: var(--bg-deep) !important;
 }
 .mode-toggle { display: flex; gap: 8px; }
 .mode-toggle .btn { font-size: 0.8rem; padding: 4px 12px; }
@@ -778,49 +811,94 @@ tbody tr:last-child td { border-bottom: none; }
 .detail-summary { font-size: 0.75rem; }
 
 /* ========================================
-   画面固有: 実績入力 (work_logs)
+   共通コンポーネント: Grid基盤
    ======================================== */
-.log-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.log-table th, .log-table td {
-    border: 1px solid var(--border);
-    padding: 6px 8px;
+.grid { width: 100%; font-size: 0.9rem; border: 1px solid var(--border); }
+.grid-row {
+    display: grid;
+    grid-template-columns: var(--grid-cols);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+.grid-row > .gc {
+    border-right: 1px solid var(--border);
+    padding: 8px 12px;
     text-align: center;
+    overflow: hidden;
+    box-sizing: border-box;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.log-table th {
-    background: var(--bg-secondary);
-    font-weight: 500;
+.grid-row > .gc:last-child { border-right: none; }
+.grid-header { position: sticky; top: 0; z-index: 10; }
+.grid-header > .gc { background: var(--bg-card); font-weight: 500; }
+.grid-row:not(.grid-header) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 40px;
+}
+
+/* Grid: Frozen列（作業名列の水平スクロール固定） */
+.grid-row > .gc-frozen {
     position: sticky;
+    left: 0;
+    z-index: 5;
+    background: inherit;
+}
+.grid-header > .gc-frozen {
+    z-index: 15;
+}
+.grid-row > .gc-frozen::after {
+    content: '';
+    position: absolute;
+    right: -4px;
     top: 0;
+    bottom: 0;
+    width: 4px;
+    box-shadow: inset 4px 0 4px -4px rgba(0, 0, 0, 0.15);
 }
-.log-table .row-header {
-    text-align: left !important;
-    min-width: 280px;
+
+/* Grid: 数値列の等幅数字 */
+.grid-row > .gc.numeric {
+    font-variant-numeric: tabular-nums;
 }
-.log-table .user-header { width: 120px; max-width: 120px; }
-.log-table .progress-header { min-width: 70px; }
-.log-table .date-header {
-    min-width: 50px;
-    font-size: 0.85rem;
+
+/* Grid: セル配置（左寄せ） */
+.grid-row > .gc.row-header,
+.grid-row > .gc.row-label,
+.grid-row > .gc.project-name,
+.grid-row > .gc.issue-name,
+.grid-row > .gc.task-label,
+.grid-row > .gc.assignee-indent,
+.grid-row > .gc.assignee-name-cell,
+.grid-row > .gc.total-label { justify-content: flex-start; }
+
+/* Grid: セル配置（右寄せ） */
+.grid-row > .gc.log-cell,
+.grid-row > .gc.estimate-cell,
+.grid-row > .gc.actual-cell,
+.grid-row > .gc.remaining-cell,
+.grid-row > .gc.actual-remaining-cell,
+.grid-row > .gc.schedule-diff-cell,
+.grid-row > .gc.unallocated-cell,
+.grid-row > .gc.hours-cell,
+.grid-row > .gc.plan-cell,
+.grid-row > .gc.row-total,
+.grid-row > .gc.col-total,
+.grid-row > .gc.grand-total,
+.grid-row > .gc.summary-cell { justify-content: flex-end; }
+
+/* Grid: ヘッダー */
+.grid-header > .gc.date-header { font-size: 0.85rem; }
+.grid-header > .gc.total-header {
+    background: var(--accent);
+    color: var(--bg-deep);
 }
-.log-table .total-header {
-    min-width: 60px;
-    background: var(--accent) !important;
-    color: var(--bg-primary) !important;
-}
-.log-table .project-row { background: var(--accent-glow); }
-.log-table .project-name {
-    text-align: left !important;
-    font-weight: 600;
-    padding: 8px 12px !important;
-}
-.log-table .issue-row { background: var(--accent-subtle); }
-.log-table .issue-name {
-    text-align: left !important;
-    font-weight: 500;
-    padding: 6px 12px 6px 24px !important;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-}
+
+/* ========================================
+   共通コンポーネント: 行種別・折り畳み・集計行
+   ======================================== */
 .bulk-actions {
     display: flex;
     gap: 8px;
@@ -839,32 +917,222 @@ tbody tr:last-child td { border-bottom: none; }
 .project-row.folded .toggle-icon,
 .issue-row.folded .toggle-icon,
 .task-row.folded .toggle-icon { transform: rotate(-90deg); }
+
+/* 行種別: プロジェクト */
+.project-row { background: var(--accent-glow); }
+.grid-row > .gc.project-name {
+    font-weight: 600;
+    padding: 8px 12px;
+}
+.project-row .summary-cell { background: var(--accent-subtle); }
+
+/* 行種別: 案件 */
+.issue-row { background: var(--accent-subtle); }
+.grid-row > .gc.issue-name {
+    font-weight: 500;
+    padding: 6px 12px 6px 24px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.issue-row .summary-cell { background: var(--accent-tint); }
+
+/* 行種別: 作業入力行 */
+.log-row:hover { background: var(--accent-dim); }
+
+/* 集計セル */
 .summary-cell {
     font-weight: 500;
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
-.project-row .summary-cell { background: var(--accent-subtle); }
-.issue-row .summary-cell { background: rgba(212, 165, 116, 0.04); }
+.row-total {
+    font-weight: 500;
+    background: var(--accent-light);
+}
+.total-row {
+    background: var(--bg-card);
+    font-weight: 600;
+    border-bottom: 2px solid var(--accent);
+}
+.col-total { font-size: 0.85rem; }
+.grand-total {
+    background: var(--accent);
+    color: var(--bg-deep);
+    font-weight: 600;
+}
+
+/* 行ラベル */
+.grid-row > .gc.row-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    padding-left: 36px;
+}
+.row-tags { margin-left: 6px; }
+
+/* ========================================
+   共通コンポーネント: セル部品
+   ======================================== */
+/* 工数入力セル */
+.grid-row > .gc.log-cell {
+    padding: 2px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    min-width: 50px;
+    user-select: none;
+}
+.log-cell:hover { background: var(--bg-input); }
+.log-input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    text-align: right;
+    font-size: 0.85rem;
+}
+.log-input:focus { outline: none; }
+.log-input::-webkit-inner-spin-button,
+.log-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.log-input { -moz-appearance: textfield; }
+
+/* ステータスセル */
+.grid-row > .gc.status-cell {
+    padding: 2px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    user-select: none;
+}
+
+/* 見積セル */
+.grid-row > .gc.estimate-cell {
+    padding: 2px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    user-select: none;
+}
+
+/* 実績セル */
+.grid-row > .gc.actual-cell {
+    font-size: 0.85rem;
+    padding: 2px 4px;
+    color: var(--text-primary);
+}
+
+/* 残セル */
+.grid-row > .gc.remaining-cell {
+    font-size: 0.85rem;
+    padding: 2px 4px;
+    color: var(--text-primary);
+}
+.gc[data-negative] { color: var(--negative); }
+
+/* 計画セル */
+.grid-row > .gc.plan-cell { padding: 0; }
+.grid-row > .gc.plan-cell .plan-input { flex: 1; min-width: 0; }
+.grid-row > .gc.plan-cell-empty { cursor: pointer; min-height: 28px; }
+.grid-row > .gc.plan-cell-empty:hover { background: var(--bg-input); }
+
+/* 担当者セル */
+.grid-row > .gc.user-cell {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    padding: 2px 6px;
+}
+
+/* 完了%セル */
+.grid-row > .gc.progress-cell {
+    padding: 2px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    user-select: none;
+}
+.progress-cell:hover { background: var(--bg-input); }
+.gc[data-weighted] { cursor: default; font-style: italic; }
+.gc[data-weighted]:hover { background: transparent; }
+.progress-input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    text-align: center;
+    font-size: 0.85rem;
+}
+.progress-input:focus { outline: none; }
+.progress-input::-webkit-inner-spin-button,
+.progress-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.progress-input { -moz-appearance: textfield; }
+
+/* 保存フィードバック */
+.log-cell.saving { opacity: 0.7; }
+.log-cell.saved { background: color-mix(in srgb, var(--success) 15%, transparent); transition: background 1.5s ease; }
+.log-cell.error { background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.plan-input.saving, .assign-input.saving { border-color: var(--accent); opacity: 0.7; }
+.plan-input.saved, .assign-input.saved { border-color: var(--success); transition: border-color 1.5s ease; }
+.plan-input.error, .assign-input.error { border-color: var(--danger); }
+select.saving { opacity: 0.7; }
+select.saved { outline: 2px solid var(--success); outline-offset: -1px; transition: outline-color 1.5s ease; }
+select.error { outline: 2px solid var(--danger); outline-offset: -1px; }
+.status-cell.saving { opacity: 0.7; }
+.status-cell.saved { background: color-mix(in srgb, var(--success) 15%, transparent); transition: background 1.5s ease; }
+.status-cell.error { background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.estimate-cell:hover { background: var(--bg-input); }
+.estimate-cell.saving { opacity: 0.7; }
+.estimate-cell.saved { background: color-mix(in srgb, var(--success) 15%, transparent); transition: background 1.5s ease; }
+.estimate-cell.error { background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.progress-cell.saving { opacity: 0.7; }
+.progress-cell.saved { background: color-mix(in srgb, var(--success) 15%, transparent); transition: background 1.5s ease; }
+.progress-cell.error { background: color-mix(in srgb, var(--danger) 15%, transparent); }
+
+/* ========================================
+   画面固有: 実績入力 (work_logs)
+   ======================================== */
 .project-total {
     font-weight: 600;
-    background: rgba(212, 165, 116, 0.2) !important;
+    background: var(--accent-strong);
 }
 .issue-total {
     font-weight: 500;
-    background: rgba(212, 165, 116, 0.12) !important;
+    background: var(--accent-mid);
 }
-.log-row:hover { background: rgba(212, 165, 116, 0.05); }
+.weekday-header { line-height: 1.3; }
+.grid-header > .gc.weekend-header {
+    background: var(--weekend-bg);
+    color: var(--text-muted);
+}
+.grid-header > .gc.today-header {
+    background: var(--accent-border);
+    color: var(--accent);
+    font-weight: 600;
+}
+.weekend-cell { background: var(--weekend-bg-cell); }
+.today-cell { background: var(--accent-glow); }
+.weekend-cell .log-input,
+.today-cell .log-input { background: transparent; }
 
-/* タスク行（アサイン管理4階層用） */
-.log-table .task-row { background: rgba(212, 165, 116, 0.03); }
-.task-row:hover { background: rgba(212, 165, 116, 0.06); }
-.task-label {
-    text-align: left !important;
+/* ========================================
+   画面固有: アサイン管理 (assignments)
+   ======================================== */
+/* タスク行 */
+.task-row { background: var(--accent-faint); }
+.task-row:hover { background: var(--accent-soft); }
+.grid-row > .gc.task-label {
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-secondary);
-    padding-left: 36px !important;
+    padding-left: 36px;
     white-space: nowrap;
 }
 .task-label-flex {
@@ -883,12 +1151,10 @@ tbody tr:last-child td { border-bottom: none; }
     flex-shrink: 0;
     white-space: nowrap;
 }
-.assignee-count-cell {
+.grid-row > .gc.assignee-count-cell {
     font-size: 0.8rem;
     white-space: nowrap;
-    padding: 2px 6px !important;
-    width: 120px;
-    max-width: 120px;
+    padding: 2px 6px;
 }
 .assignee-count-badge {
     display: inline-block;
@@ -900,22 +1166,22 @@ tbody tr:last-child td { border-bottom: none; }
     font-weight: 500;
 }
 .assignee-count-zero {
-    background: rgba(107, 114, 128, 0.15);
+    background: var(--muted-bg);
     color: var(--text-muted);
 }
 
 /* 担当者サブ行 */
 .assignee-sub-row { font-size: 0.85rem; }
-.assignee-sub-row:hover { background: rgba(212, 165, 116, 0.03); }
-.assignee-indent {
-    padding-left: 36px !important;
-    padding-right: 8px !important;
-    text-align: right !important;
+.assignee-sub-row:hover { background: var(--accent-faint); }
+.grid-row > .gc.assignee-indent {
+    padding-left: 36px;
+    padding-right: 8px;
+    justify-content: flex-end;
 }
-.assignee-name-cell {
+.grid-row > .gc.assignee-name-cell {
     font-size: 0.85rem;
     white-space: nowrap;
-    padding: 2px 6px !important;
+    padding: 2px 6px;
 }
 .btn-remove-assignee {
     background: none;
@@ -926,14 +1192,11 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 0 4px;
     line-height: 1;
     border-radius: 3px;
-    vertical-align: middle;
 }
 .btn-remove-assignee:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.1);
+    color: var(--negative);
+    background: var(--negative-glow);
 }
-
-/* 担当者追加ボタン（task-row内） */
 .btn-add-assignee {
     background: none;
     border: 1px solid var(--border);
@@ -943,15 +1206,12 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 0 5px;
     line-height: 1.4;
     border-radius: 3px;
-    vertical-align: middle;
     margin-left: 4px;
 }
 .btn-add-assignee:hover {
     background: var(--accent-subtle);
 }
-.assignee-display {
-    vertical-align: middle;
-}
+.assignee-display { vertical-align: middle; }
 .assignee-autocomplete-wrapper { position: relative; display: block; }
 .assignee-autocomplete-input {
     padding: 3px 8px;
@@ -961,7 +1221,7 @@ tbody tr:last-child td { border-bottom: none; }
     box-sizing: border-box;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
 }
 .assignee-autocomplete-dropdown {
@@ -976,107 +1236,15 @@ tbody tr:last-child td { border-bottom: none; }
     overflow-y: auto;
     z-index: 1000;
     display: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 .assignee-autocomplete-dropdown.show { display: block; }
-
-.row-label {
-    text-align: left !important;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    padding-left: 36px !important;
-}
-.row-tags { margin-left: 6px; }
-.log-cell { padding: 2px !important; }
-.log-input {
-    width: 50px;
-    padding: 4px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-primary);
-    text-align: right;
-    font-size: 0.85rem;
-}
-.log-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    background: var(--bg-primary);
-}
-.log-input::-webkit-inner-spin-button,
-.log-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-.log-input { -moz-appearance: textfield; }
-.user-cell {
-    font-size: 0.85rem;
-    white-space: nowrap;
-    padding: 2px 6px !important;
-}
-.progress-cell { padding: 2px !important; }
-.progress-input {
-    width: 50px;
-    padding: 4px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-primary);
-    text-align: center;
-    font-size: 0.85rem;
-}
-.progress-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    background: var(--bg-primary);
-}
-.progress-input::-webkit-inner-spin-button,
-.progress-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-.progress-input { -moz-appearance: textfield; }
-.row-total {
-    font-weight: 500;
-    background: var(--accent-light);
-}
-.total-row {
-    background: var(--bg-secondary);
-    font-weight: 600;
-    border-bottom: 2px solid var(--accent);
-}
-.hours-cell { text-align: right; }
-.total-label { text-align: left !important; }
-.col-total { font-size: 0.85rem; }
-.grand-total {
-    background: var(--accent) !important;
-    color: var(--bg-primary) !important;
-    font-weight: 600;
-}
-/* 週表示 */
-.week-table .date-header { min-width: 70px; }
-.weekday-header { line-height: 1.3; }
-.weekend-header {
-    background: rgba(128, 128, 128, 0.2) !important;
-    color: var(--text-muted);
-}
-.today-header {
-    background: rgba(212, 165, 116, 0.3) !important;
-    color: var(--accent);
-    font-weight: 600;
-}
-.weekend-cell { background: rgba(128, 128, 128, 0.1); }
-.today-cell { background: var(--accent-glow); }
-.weekend-cell .log-input,
-.today-cell .log-input { background: transparent; }
-.week-table .log-input { width: 60px; }
 
 /* ========================================
    画面固有: 業務終了報告 (work_report)
    ======================================== */
 .report-card {
-    background: var(--bg-secondary);
+    background: var(--bg-card);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -1126,7 +1294,7 @@ tbody tr:last-child td { border-bottom: none; }
     padding: 12px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     color: var(--text-primary);
     font-family: monospace;
     font-size: 0.9rem;
@@ -1159,13 +1327,13 @@ tbody tr:last-child td { border-bottom: none; }
     color: var(--text-muted);
 }
 .template-help code {
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     padding: 2px 6px;
     border-radius: 3px;
     font-family: monospace;
 }
 .preview-section {
-    background: var(--bg-primary);
+    background: var(--bg-deep);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 16px;
@@ -1184,7 +1352,7 @@ tbody tr:last-child td { border-bottom: none; }
 .btn-copy {
     padding: 6px 16px;
     background: var(--accent);
-    color: var(--bg-primary);
+    color: var(--bg-deep);
     border: none;
     border-radius: 4px;
     font-size: 0.85rem;
@@ -1270,7 +1438,7 @@ tbody tr:last-child td { border-bottom: none; }
     text-align: right;
 }
 .subtotal-row {
-    background: rgba(212, 165, 116, 0.05);
+    background: var(--accent-dim);
     border-top: 2px solid var(--border);
 }
 .progress-badge {

@@ -19,6 +19,22 @@ class StatusService:
         return [dict(r) for r in rows]
 
     @staticmethod
+    def get_all_bulk(project_ids: list[int]) -> dict[int, list[dict]]:
+        """複数プロジェクトのステータス一覧を一括取得"""
+        if not project_ids:
+            return {}
+        placeholders = ",".join("?" * len(project_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM project_status WHERE project_id IN ({placeholders}) ORDER BY project_id, sort_order ASC",
+                project_ids
+            ).fetchall()
+        result: dict[int, list[dict]] = {pid: [] for pid in project_ids}
+        for r in rows:
+            result[r['project_id']].append(dict(r))
+        return result
+
+    @staticmethod
     def get_by_id(status_id: int, project_id: int) -> dict | None:
         """ステータスをIDで取得"""
         with get_db() as conn:

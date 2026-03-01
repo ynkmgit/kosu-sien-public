@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from services import IssueTagService
 from .common import templates, get_project_or_404, get_issue_or_404, render_edit_actions, FilterParams, get_filter_params
+from .common.renders import TAG_DEFAULT_COLOR
 
 router = APIRouter(prefix="/projects/{project_id}/issues/{issue_id}/issue-tags", tags=["issue_tags"])
 
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/projects/{project_id}/issues/{issue_id}/issue-tags",
 def render_row(tag, project_id: int, issue_id: int, editing=False):
     """タグ行HTML生成"""
     name = escape(tag['name'])
-    color = escape(tag['color'] or '#6b7280')
+    color = escape(tag['color'] or TAG_DEFAULT_COLOR)
     sort_order = tag['sort_order']
 
     base_path = f"/projects/{project_id}/issues/{issue_id}/issue-tags"
