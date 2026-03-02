@@ -531,14 +531,18 @@ function _activateLogCell(cell) {
     input.dataset.taskId = cell.dataset.taskId;
     input.dataset.userId = cell.dataset.userId;
     input.dataset.date = cell.dataset.date;
+    input.dataset.originalValue = currentValue;
 
     cell.textContent = '';
     cell.appendChild(input);
     input.focus();
     input.select();
 
-    // blur時にセルを非アクティブ化
+    // blur時にセルを非アクティブ化（2重呼び出しを防ぐ）
+    let _logDeactivated = false;
     input.addEventListener('blur', () => {
+        if (_logDeactivated) return;
+        _logDeactivated = true;
         _deactivateLogCell(cell, input);
     });
 
@@ -567,19 +571,21 @@ function _activateLogCell(cell) {
  * click-to-edit: log-cellを非アクティブ化（inputからテキストに戻す）
  */
 function _deactivateLogCell(cell, input) {
+    if (input.dataset.deactivating) return;
+    input.dataset.deactivating = '1';
+
     const newValue = safeParseFloat(input.value);
-    const oldValue = workLogModel.rows[`${input.dataset.taskId}-${input.dataset.userId}`]?.[input.dataset.date] || 0;
+    const originalValue = safeParseFloat(input.dataset.originalValue || '0');
     const display = newValue > 0 ? newValue.toFixed(2) : '';
 
-    cell.removeChild(input);
+    if (input.parentNode === cell) cell.removeChild(input);
     cell.textContent = display;
 
-    // 値が変わった場合のみモデル更新とサーバー保存
-    if (newValue !== oldValue) {
-        workLogModel.update(input.dataset.taskId, input.dataset.userId, input.dataset.date, newValue);
+    // 値が変わった場合のみサーバー保存（workLogModelはinputイベントで既に更新済み）
+    if (newValue !== originalValue) {
         _sendJSON('POST', '/work-logs', {
             task_id: input.dataset.taskId, user_id: input.dataset.userId,
-            work_date: input.dataset.date, hours: input.value || 0
+            work_date: input.dataset.date, hours: newValue
         }, cell);
         _debouncedRecalc();
     }
@@ -701,7 +707,10 @@ function _activateProgressCell(cell) {
     input.focus();
     input.select();
 
+    let _progDeactivated = false;
     input.addEventListener('blur', () => {
+        if (_progDeactivated) return;
+        _progDeactivated = true;
         _deactivateProgressCell(cell, input);
     });
 
@@ -723,11 +732,14 @@ function _activateProgressCell(cell) {
  * click-to-edit: progress-cellを非アクティブ化
  */
 function _deactivateProgressCell(cell, input) {
+    if (input.dataset.deactivating) return;
+    input.dataset.deactivating = '1';
+
     const newValue = input.value.trim();
     const oldValue = cell.dataset.value || '';
     const display = newValue !== '' ? `${newValue}%` : '';
 
-    cell.removeChild(input);
+    if (input.parentNode === cell) cell.removeChild(input);
     cell.textContent = display;
     cell.dataset.value = newValue;
 
@@ -757,7 +769,10 @@ function _activateEstimateCell(cell) {
     input.focus();
     input.select();
 
+    let _estDeactivated = false;
     input.addEventListener('blur', () => {
+        if (_estDeactivated) return;
+        _estDeactivated = true;
         _deactivateEstimateCell(cell, input);
     });
 
@@ -779,11 +794,14 @@ function _activateEstimateCell(cell) {
  * click-to-edit: estimate-cellを非アクティブ化
  */
 function _deactivateEstimateCell(cell, input) {
+    if (input.dataset.deactivating) return;
+    input.dataset.deactivating = '1';
+
     const newValue = input.value.trim();
     const oldValue = cell.dataset.value || '';
     const display = newValue && parseFloat(newValue) > 0 ? parseFloat(newValue).toFixed(2) : '';
 
-    cell.removeChild(input);
+    if (input.parentNode === cell) cell.removeChild(input);
     cell.textContent = display;
     cell.dataset.value = display;
 
